@@ -1,0 +1,2447 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VÕ HOÀI NAM | Hệ Thống Bán Key Bản Quyền Tự Động 3D</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js cho nền 3D sóng động tương tác -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Font Awesome cho Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Space Grotesk & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+
+    <script>
+        // Cấu hình Tailwind CSS với font chữ và bảng màu neon đặc trưng của cửa hàng Võ Hoài Nam
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                    },
+                    colors: {
+                        cyber: {
+                            dark: '#050811',
+                            card: 'rgba(13, 19, 38, 0.74)',
+                            cyan: '#00f2fe',
+                            purple: '#a855f7',
+                            gold: '#fbbf24'
+                        }
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Nền tối sâu và khóa cuộn ngang trên mọi kích thước màn hình */
+        body {
+            background-color: #050811;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        /* Canvas 3D cố định toàn màn hình */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Hiệu ứng kính mờ Glassmorphism */
+        .glass-panel {
+            background: rgba(13, 19, 38, 0.76);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.55);
+        }
+
+        /* Hiệu ứng thẻ nghiêng 3D (3D Tilt Cards) */
+        .tilt-card {
+            transform-style: preserve-3d;
+            transition: transform 0.15s ease-out, box-shadow 0.3s ease;
+            position: relative;
+        }
+
+        .tilt-card-inner {
+            transform: translateZ(24px);
+        }
+
+        /* Hiệu ứng phát sáng viền theo từng cấp độ gói Key */
+        .neon-border-cyan:hover {
+            border-color: rgba(0, 242, 254, 0.65);
+            box-shadow: 0 0 28px rgba(0, 242, 254, 0.25), inset 0 0 15px rgba(0, 242, 254, 0.1);
+        }
+
+        .neon-border-purple {
+            border-color: rgba(168, 85, 247, 0.45);
+            box-shadow: 0 0 30px rgba(168, 85, 247, 0.2);
+        }
+
+        .neon-border-purple:hover {
+            border-color: rgba(168, 85, 247, 0.85);
+            box-shadow: 0 0 38px rgba(168, 85, 247, 0.4), inset 0 0 20px rgba(168, 85, 247, 0.15);
+        }
+
+        .neon-border-gold {
+            border-color: rgba(251, 191, 36, 0.5);
+            box-shadow: 0 0 30px rgba(251, 191, 36, 0.2);
+        }
+
+        .neon-border-gold:hover {
+            border-color: rgba(251, 191, 36, 0.9);
+            box-shadow: 0 0 40px rgba(251, 191, 36, 0.4), inset 0 0 20px rgba(251, 191, 36, 0.15);
+        }
+
+        .text-glow-cyan {
+            text-shadow: 0 0 22px rgba(0, 242, 254, 0.55);
+        }
+
+        /* Thanh cuộn tùy chỉnh */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #050811;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00f2fe;
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-cyan-500 selection:text-slate-950">
+
+    <!-- Nền 3D sóng động Three.js -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Vùng hiển thị thông báo Toast -->
+    <div id="toast-container" class="fixed top-20 right-4 z-[70] flex flex-col gap-3 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- HEADER -->
+    <header class="fixed top-0 left-0 right-0 z-40 glass-panel border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16 md:h-20">
+                <!-- Logo Thương Hiệu (Chạm 5 lần trong 1.5s cũng mở Admin) -->
+                <a href="#" onclick="handleLogoSecretTap(event)" class="flex items-center gap-3 group select-none">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 p-[2px] shadow-lg shadow-cyan-500/30 group-hover:scale-105 transition-transform">
+                        <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+                            <span class="font-display font-bold text-lg bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">VHN</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="font-display font-bold text-lg md:text-xl tracking-wider bg-gradient-to-r from-white via-cyan-200 to-purple-300 bg-clip-text text-transparent block leading-none">
+                            VÕ HOÀI NAM
+                        </span>
+                        <span class="text-[10px] uppercase tracking-[0.2em] text-cyan-400 font-semibold">Auto License Key Store</span>
+                    </div>
+                </a>
+
+                <!-- Menu điều hướng trên màn hình lớn -->
+                <nav class="hidden md:flex items-center gap-7 text-sm font-medium text-slate-300">
+                    <a href="#pricing" class="hover:text-cyan-400 transition-colors flex items-center gap-1.5">
+                        <i class="fa-solid fa-tags text-cyan-400/80"></i> Bảng Giá Key
+                    </a>
+                    <a href="#my-keys-section" onclick="handleNavMyKeys(event)" class="hover:text-cyan-400 transition-colors flex items-center gap-1.5">
+                        <i class="fa-solid fa-vault text-purple-400/80"></i> Kho Key Của Tôi
+                    </a>
+                    <a href="#contact" class="hover:text-cyan-400 transition-colors flex items-center gap-1.5">
+                        <i class="fa-solid fa-headset text-amber-400/80"></i> Hỗ Trợ & Deploy
+                    </a>
+                </nav>
+
+                <!-- Khu vực Tài Khoản Thành Viên & Nút Admin -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div id="header-account-area">
+                        <!-- Render bằng JS -->
+                    </div>
+
+                    <button type="button" onclick="openAdminModal()" class="p-2.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-800/85 hover:bg-purple-600/30 border border-white/10 hover:border-purple-400/50 text-xs font-semibold text-slate-200 transition-all flex items-center gap-2 cursor-pointer" title="Quản Trị Viên">
+                        <i class="fa-solid fa-shield-halved text-purple-400"></i>
+                        <span>Admin</span>
+                    </button>
+
+                    <button type="button" id="mobile-menu-btn" class="md:hidden p-2 rounded-lg text-slate-300 hover:bg-white/10" aria-label="Mở menu">
+                        <i class="fa-solid fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Menu điều hướng trên điện thoại -->
+        <div id="mobile-menu" class="hidden md:hidden glass-panel border-t border-white/10 px-4 pt-3 pb-5 space-y-2">
+            <a href="#pricing" onclick="toggleMobileMenu()" class="block px-3 py-2.5 rounded-lg hover:bg-white/5 text-slate-200 font-medium">
+                <i class="fa-solid fa-tags text-cyan-400 w-6"></i> Bảng Giá Key
+            </a>
+            <a href="#my-keys-section" onclick="handleNavMyKeys(event); toggleMobileMenu()" class="block px-3 py-2.5 rounded-lg hover:bg-white/5 text-slate-200 font-medium">
+                <i class="fa-solid fa-vault text-purple-400 w-6"></i> Kho Key Của Tôi
+            </a>
+            <a href="#contact" onclick="toggleMobileMenu()" class="block px-3 py-2.5 rounded-lg hover:bg-white/5 text-slate-200 font-medium">
+                <i class="fa-solid fa-headset text-amber-400 w-6"></i> Hỗ Trợ & Hướng Dẫn
+            </a>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="pt-24 md:pt-32 pb-20">
+
+        <!-- HERO SECTION -->
+        <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel border border-cyan-500/30 text-cyan-300 text-xs sm:text-sm font-medium mb-6 animate-float">
+                <i class="fa-solid fa-bolt text-amber-400"></i>
+                <span>Thanh Toán Số Dư Tài Khoản • Gói 1H chỉ 700đ • Kho Key Cá Nhân</span>
+            </div>
+
+            <h1 class="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-tight mb-6">
+                <span class="block text-white">HỆ THỐNG BÁN KEY TỰ ĐỘNG</span>
+                <span class="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500 bg-clip-text text-transparent text-glow-cyan">
+                    VÕ HOÀI NAM OFFICIAL
+                </span>
+            </h1>
+
+            <p class="max-w-2xl mx-auto text-slate-400 text-base sm:text-lg mb-10 leading-relaxed">
+                Nền tảng phân phối mã bản quyền phần mềm tốc độ cao. Tạo tài khoản thành viên, nạp tiền qua QR của <strong class="text-white">PHAN CHI VY</strong> để Admin cộng số dư, thanh toán bằng số dư tài khoản và nhận Key lưu ngay vào kho cá nhân.
+            </p>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+                <a href="#pricing" class="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-base shadow-lg shadow-cyan-500/30 hover:shadow-cyan-400/50 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-cart-shopping"></i>
+                    <span>Chọn Gói Mua Key</span>
+                </a>
+                <button type="button" onclick="openUserDashboardOrAuth()" class="w-full sm:w-auto px-8 py-4 rounded-2xl glass-panel hover:bg-white/10 border border-purple-500/40 text-white font-bold text-base shadow-lg shadow-purple-500/10 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2 cursor-pointer">
+                    <i class="fa-solid fa-user-astronaut text-purple-400"></i>
+                    <span id="hero-account-btn-text">Đăng Ký / Tài Khoản Của Tôi</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+                <div class="glass-panel rounded-2xl p-4 border border-white/5">
+                    <div class="font-display text-2xl sm:text-3xl font-bold text-cyan-400">18,650+</div>
+                    <div class="text-xs text-slate-400 mt-1">Key Đã Giao Dịch</div>
+                </div>
+                <div class="glass-panel rounded-2xl p-4 border border-white/5">
+                    <div class="font-display text-2xl sm:text-3xl font-bold text-purple-400">99.9%</div>
+                    <div class="text-xs text-slate-400 mt-1">Hệ Thống Online</div>
+                </div>
+                <div class="glass-panel rounded-2xl p-4 border border-white/5">
+                    <div class="font-display text-2xl sm:text-3xl font-bold text-emerald-400">Tức Thì</div>
+                    <div class="text-xs text-slate-400 mt-1">Cấp Key Khi Đủ Số Dư</div>
+                </div>
+                <div class="glass-panel rounded-2xl p-4 border border-white/5">
+                    <div class="font-display text-2xl sm:text-3xl font-bold text-amber-400">24/7</div>
+                    <div class="text-xs text-slate-400 mt-1">Bảo Hành Trọn Đời</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- KHU VỰC BẢNG GIÁ KEY (3D TILT CARDS) -->
+        <section id="pricing" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-28">
+            <div class="text-center mb-14">
+                <span class="text-cyan-400 font-semibold text-sm tracking-widest uppercase">Bản Quyền Chính Hãng</span>
+                <h2 class="font-display text-3xl sm:text-4xl font-bold text-white mt-2">Bảng Giá 5 Gói Key Bản Quyền</h2>
+                <p class="text-slate-400 mt-2 text-sm sm:text-base">
+                    Yêu cầu <strong class="text-cyan-400">Đăng nhập / Tạo tài khoản</strong> và <strong class="text-emerald-400">đủ số dư tài khoản</strong> mới có thể mua Key.
+                </p>
+            </div>
+
+            <div id="pricing-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+                <!-- Các thẻ gói Key 3D được render tự động từ JS -->
+            </div>
+        </section>
+
+        <!-- KHU VỰC KHO KEY CÁ NHÂN TRÊN TRANG -->
+        <section id="my-keys-section" class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-28">
+            <div class="glass-panel rounded-3xl p-6 sm:p-8 lg:p-10 border border-white/10 relative overflow-hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/10">
+                    <div>
+                        <span class="text-purple-400 font-bold text-xs uppercase tracking-widest">Member Cloud Vault</span>
+                        <h2 class="font-display text-2xl sm:text-3xl font-bold text-white mt-1">Kho Key Đã Mua Của Bạn</h2>
+                    </div>
+                    <div id="vault-header-actions">
+                        <!-- Render động nút Mở Dashboard hoặc Đăng nhập -->
+                    </div>
+                </div>
+
+                <!-- Thanh tìm kiếm và lọc mã Key -->
+                <div id="vault-filter-bar" class="hidden mt-5 flex flex-col sm:flex-row gap-3">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="vault-search-input" oninput="renderAccountUI()" placeholder="Tìm theo mã Key (VD: VHN-KEY1H...) hoặc tên gói..." class="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-950/90 border border-white/10 focus:border-cyan-400 outline-none text-white text-xs sm:text-sm">
+                    </div>
+                    <select id="vault-pkg-filter" onchange="renderAccountUI()" class="px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-white/10 focus:border-purple-400 outline-none text-slate-200 text-xs sm:text-sm">
+                        <option value="ALL">Tất cả các gói</option>
+                        <option value="KEY1H">Gói 1 Giờ (1h)</option>
+                        <option value="KEY1D">Gói 1 Ngày (1d)</option>
+                        <option value="KEY7D">Gói 7 Ngày (7d)</option>
+                        <option value="KEY30D">Gói 30 Ngày (30d)</option>
+                        <option value="KEYVIP">Gói Vĩnh Viễn VIP (lifetime)</option>
+                    </select>
+                </div>
+
+                <div id="page-vault-content" class="mt-6">
+                    <!-- Render động bằng JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- HƯỚNG DẪN DEPLOY GITHUB PAGES / CLOUDFLARE PAGES & LIÊN HỆ -->
+        <section id="contact" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-28">
+            <div class="glass-panel rounded-3xl p-8 sm:p-10 border border-white/10 relative overflow-hidden">
+                <div class="absolute -right-20 -top-20 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute -left-20 -bottom-20 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center relative z-10">
+                    <div>
+                        <span class="px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-bold border border-cyan-500/20">HỖ TRỢ KHÁCH HÀNG 24/7</span>
+                        <h2 class="font-display text-2xl sm:text-3xl font-bold text-white mt-4">Kết Nối Trực Tiếp Với Admin Võ Hoài Nam</h2>
+                        <p class="text-slate-400 text-sm mt-3 leading-relaxed">
+                            Cần nạp số dư tài khoản qua QR <strong>PHAN CHI VY</strong>, thêm kho Key số lượng lớn, gặp vấn đề thanh toán hoặc muốn đăng ký làm cộng tác viên phân phối Key? Liên hệ ngay qua các kênh chính thức:
+                        </p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
+                            <a href="https://zalo.me" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-2xl bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/40 text-blue-300 font-bold text-sm transition-all">
+                                <i class="fa-solid fa-comment-dots text-lg"></i>
+                                <span>Zalo Admin</span>
+                            </a>
+                            <a href="https://t.me" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-2xl bg-sky-500/20 hover:bg-sky-500/40 border border-sky-400/40 text-sky-300 font-bold text-sm transition-all">
+                                <i class="fa-brands fa-telegram text-lg"></i>
+                                <span>Telegram</span>
+                            </a>
+                            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" class="flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-2xl bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/40 text-indigo-300 font-bold text-sm transition-all">
+                                <i class="fa-brands fa-facebook text-lg"></i>
+                                <span>Facebook</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-950/80 rounded-2xl p-6 border border-white/10">
+                        <div class="flex items-center gap-2.5 text-amber-400 font-bold text-sm mb-3">
+                            <i class="fa-brands fa-github text-xl text-white"></i>
+                            <span>Hướng Dẫn Đưa Website Lên GitHub Pages / Cloudflare Pages</span>
+                        </div>
+                        <ol class="space-y-2.5 text-xs sm:text-sm text-slate-300 list-decimal list-inside">
+                            <li>Tạo Repository trên <strong>GitHub</strong> và đặt tên file chính là <code class="px-1.5 py-0.5 rounded bg-white/10 text-cyan-300 font-mono">index.html</code>, kèm ảnh QR <code class="px-1.5 py-0.5 rounded bg-white/10 text-amber-300 font-mono">admin-qr.jpg</code> cùng thư mục.</li>
+                            <li><strong>GitHub Pages:</strong> Vào <em>Settings &rarr; Pages</em>, chọn branch <code class="px-1.5 py-0.5 rounded bg-white/10 text-purple-300 font-mono">main</code> / <code class="px-1.5 py-0.5 rounded bg-white/10 text-purple-300 font-mono">/(root)</code> và bấm <strong>Save</strong>.</li>
+                            <li><strong>Cloudflare Pages:</strong> Vào <em>Workers & Pages &rarr; Create &rarr; Pages</em>, kết nối repo hoặc chọn <em>Direct Upload</em> với Framework preset <strong>None</strong>.</li>
+                            <li>Nếu muốn đồng bộ đa thiết bị qua Cloudflare Worker, điền <code class="text-emerald-400">API_BASE</code> ở phần cấu hình JS; khi để trống, hệ thống tự chạy bằng <code class="text-cyan-300">localStorage</code>.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="border-t border-white/10 bg-slate-950/90 py-8 text-center text-xs sm:text-sm text-slate-400">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <span class="font-display font-bold text-white">VÕ HOÀI NAM</span>
+                <span>&copy; 2026. All rights reserved.</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-slate-500">3D Key Store Engine v7.0</span>
+                <button type="button" onclick="openAdminModal()" class="text-purple-400 hover:underline font-semibold cursor-pointer">Quản Trị Hệ Thống</button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- NÚT LIÊN HỆ NỔI GÓC DƯỚI -->
+    <div class="fixed bottom-5 right-5 z-40 flex flex-col gap-3">
+        <a href="https://zalo.me" target="_blank" rel="noopener noreferrer" class="w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/40 flex items-center justify-center transition-transform hover:scale-110" title="Chat Zalo Võ Hoài Nam">
+            <span class="font-extrabold text-xs">Zalo</span>
+        </a>
+        <a href="https://t.me" target="_blank" rel="noopener noreferrer" class="w-12 h-12 rounded-full bg-sky-500 hover:bg-sky-400 text-white shadow-lg shadow-sky-500/40 flex items-center justify-center transition-transform hover:scale-110" title="Telegram Hỗ Trợ">
+            <i class="fa-brands fa-telegram text-xl"></i>
+        </a>
+    </div>
+
+    <!-- ==========================================================================
+         MODAL 1: ĐĂNG NHẬP & TẠO TÀI KHOẢN THÀNH VIÊN (BẮT BUỘC KHI MUA KEY)
+         ========================================================================== -->
+    <div id="auth-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-6 sm:p-8 border border-cyan-500/30 relative">
+            <button type="button" onclick="closeAuthModal()" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/5 hover:bg-white/15 text-slate-300 flex items-center justify-center cursor-pointer">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div id="pending-pkg-banner" class="hidden mb-5 p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs flex items-center gap-3">
+                <i class="fa-solid fa-bag-shopping text-lg text-amber-400 shrink-0"></i>
+                <div>
+                    <span class="block font-bold">Vui lòng đăng nhập hoặc tạo tài khoản</span>
+                    <span id="pending-pkg-text" class="text-slate-300">Để kiểm tra số dư, thanh toán và lưu Key vào tài khoản của bạn.</span>
+                </div>
+            </div>
+
+            <div class="flex p-1.5 rounded-2xl bg-slate-950/90 border border-white/10 mb-6">
+                <button type="button" id="auth-tab-register" onclick="switchAuthTab('register')" class="flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 transition-all cursor-pointer">
+                    <i class="fa-solid fa-user-plus mr-1"></i> Tạo Tài Khoản
+                </button>
+                <button type="button" id="auth-tab-login" onclick="switchAuthTab('login')" class="flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-400 hover:text-white transition-all cursor-pointer">
+                    <i class="fa-solid fa-right-to-bracket mr-1"></i> Đăng Nhập
+                </button>
+            </div>
+
+            <form id="register-form" onsubmit="handleRegister(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Tên đăng nhập (Username) *</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-cyan-400"></i>
+                        <input type="text" id="reg-username" required minlength="3" maxlength="20" pattern="[a-zA-Z0-9_]+" placeholder="VD: hoainam99 (viết liền không dấu)" class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/90 border border-white/10 focus:border-cyan-400 outline-none text-white text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Email hoặc Số điện thoại *</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-envelope absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-400"></i>
+                        <input type="text" id="reg-contact" required placeholder="VD: nam@gmail.com hoặc 0988..." class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/90 border border-white/10 focus:border-purple-400 outline-none text-white text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Mật khẩu *</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-400"></i>
+                        <input type="password" id="reg-password" required minlength="4" placeholder="Nhập mật khẩu (tối thiểu 4 ký tự)" class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/90 border border-white/10 focus:border-emerald-400 outline-none text-white text-sm">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold text-sm shadow-lg shadow-cyan-500/25 transition-all cursor-pointer">
+                    Tạo Tài Khoản & Tiếp Tục
+                </button>
+            </form>
+
+            <form id="login-form" onsubmit="handleLogin(event)" class="hidden space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Tên đăng nhập *</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-cyan-400"></i>
+                        <input type="text" id="login-username" required placeholder="Nhập tên đăng nhập của bạn..." class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/90 border border-white/10 focus:border-cyan-400 outline-none text-white text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Mật khẩu *</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-400"></i>
+                        <input type="password" id="login-password" required placeholder="Nhập mật khẩu..." class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/90 border border-white/10 focus:border-purple-400 outline-none text-white text-sm">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-sm shadow-lg shadow-purple-500/25 transition-all cursor-pointer">
+                    Đăng Nhập Ngay
+                </button>
+
+                <p class="text-[11px] text-center text-slate-400">
+                    Tài khoản demo có sẵn: <code class="text-cyan-400">khachhang</code> / <code class="text-cyan-400">123456</code> (Số dư sẵn 50.000đ)
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         MODAL 2: BẢNG ĐIỀU KHIỂN TÀI KHOẢN, SỐ DƯ & KHO KEY ĐÃ MUA
+         ========================================================================== -->
+    <div id="user-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+        <div class="glass-panel rounded-3xl max-w-3xl w-full p-6 sm:p-8 border border-cyan-500/30 relative max-h-[90vh] overflow-y-auto">
+            <button type="button" onclick="closeUserModal()" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/5 hover:bg-white/15 text-slate-300 flex items-center justify-center cursor-pointer">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/10">
+                <div class="flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-purple-600 p-[2px]">
+                        <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-xl font-display font-bold text-cyan-400" id="user-modal-avatar">
+                            U
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h3 id="user-modal-name" class="font-display text-xl sm:text-2xl font-bold text-white">username</h3>
+                            <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[11px] font-bold">Thành Viên</span>
+                            <span id="user-modal-balance" class="px-3 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono text-xs font-extrabold">0 VNĐ</span>
+                        </div>
+                        <p id="user-modal-contact" class="text-xs text-slate-400 mt-0.5">email@domain.com</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <a href="#pricing" onclick="closeUserModal()" class="px-3.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 font-bold text-xs transition-all">
+                        <i class="fa-solid fa-plus mr-1"></i> Mua Thêm Key
+                    </a>
+                    <button type="button" onclick="handleLogout()" class="px-3.5 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white font-bold text-xs transition-all cursor-pointer">
+                        <i class="fa-solid fa-right-from-bracket mr-1"></i> Đăng Xuất
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-5 bg-slate-950/75 rounded-2xl p-4 border border-white/10">
+                <h4 class="font-display font-bold text-sm text-emerald-400 flex items-center gap-2 mb-3">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Lịch Sử Biến Động Số Dư Tài Khoản</span>
+                </h4>
+                <div id="user-modal-balance-logs" class="space-y-2 max-h-40 overflow-y-auto text-xs">
+                    <!-- Render lịch sử số dư bằng JS -->
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="font-display font-bold text-base text-white flex items-center gap-2">
+                        <i class="fa-solid fa-key text-amber-400"></i>
+                        <span>Danh Sách Key Bản Quyền Đã Mua / Được Cấp</span>
+                    </h4>
+                    <span id="user-modal-key-count" class="px-3 py-1 rounded-full bg-white/10 text-xs font-bold text-cyan-300">0 Key</span>
+                </div>
+
+                <div id="user-modal-keys-list" class="space-y-3">
+                    <!-- Render danh sách key bằng JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         MODAL 3: THANH TOÁN BẰNG SỐ DƯ & QUÉT QR NẠP TIỀN ADMIN (PHAN CHI VY)
+         ========================================================================== -->
+    <div id="payment-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-6 sm:p-7 border border-cyan-500/30 relative max-h-[92vh] overflow-y-auto">
+            <button type="button" onclick="closePaymentModal()" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/5 hover:bg-white/15 text-slate-300 flex items-center justify-center cursor-pointer">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div class="text-center">
+                <span class="px-3 py-1 rounded-full bg-cyan-500/15 text-cyan-400 text-xs font-bold">THANH TOÁN BẰNG SỐ DƯ TÀI KHOẢN</span>
+                <h3 id="modal-pkg-name" class="font-display text-xl font-bold text-white mt-2">Gói 1 Giờ (1h)</h3>
+                <p id="modal-pkg-price" class="text-2xl font-extrabold text-amber-400 mt-1">700 VNĐ</p>
+                <p id="modal-current-balance-info" class="text-xs text-emerald-400 font-semibold mt-1">Số dư hiện tại: 0 VNĐ</p>
+            </div>
+
+            <!-- Thanh toán bắt buộc bằng số dư tài khoản -->
+            <div class="mt-4 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30">
+                <button type="button" id="pay-with-balance-btn" onclick="payWithAccountBalance()" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-500/25 transition-all cursor-pointer flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-wallet"></i>
+                    <span id="pay-with-balance-label">Thanh Toán Ngay Bằng Số Dư</span>
+                </button>
+                <p id="pay-balance-hint" class="text-[11px] text-center text-slate-300 mt-1.5">Trừ trực tiếp số dư và nhận Key ngay lập tức.</p>
+            </div>
+
+            <!-- Khối mã QR tĩnh của Admin (PHAN CHI VY) để nạp thêm số dư -->
+            <div class="relative flex py-3 items-center">
+                <div class="flex-grow border-t border-white/10"></div>
+                <span class="flex-shrink mx-3 text-[11px] uppercase tracking-wider text-slate-400">QR Nạp Số Dư Admin (PHAN CHI VY)</span>
+                <div class="flex-grow border-t border-white/10"></div>
+            </div>
+
+            <div class="my-2 bg-white p-2 rounded-2xl w-44 h-56 mx-auto shadow-xl shadow-cyan-500/20 flex items-center justify-center overflow-hidden">
+                <img id="modal-qr-img" src="./admin-qr.jpg" alt="QR Nhận Tiền Admin PHAN CHI VY" class="w-full h-full object-contain rounded-xl" onerror="handleAdminQrFallback(this)">
+            </div>
+
+            <div class="space-y-2 bg-slate-950/90 p-3.5 rounded-2xl border border-white/10 text-xs">
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400">Tài khoản nhận Key:</span>
+                    <span id="modal-buyer-username" class="font-bold text-emerald-400">@username</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400">Chủ tài khoản QR:</span>
+                    <span class="font-bold text-white">PHAN CHI VY</span>
+                </div>
+                <div class="flex justify-between items-center pt-1.5 border-t border-white/10">
+                    <span class="text-slate-400">Nội dung nạp tiền:</span>
+                    <div class="flex items-center gap-2">
+                        <span id="transfer-memo" class="font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">VHN USER KEY1H</span>
+                        <button type="button" onclick="copyMemo()" class="text-amber-400 hover:text-amber-300 cursor-pointer" title="Sao chép nội dung">
+                            <i class="fa-regular fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <p class="mt-3 text-[11px] text-center text-slate-400 leading-relaxed">
+                Quét mã QR của <strong class="text-white">PHAN CHI VY</strong> để chuyển khoản nạp tiền, sau đó gửi nội dung cho Admin cộng số dư vào tài khoản trước khi mua Key.
+            </p>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         MODAL 4: BẢNG QUẢN TRỊ ADMIN (TÀI KHOẢN chivy + MẬT KHẨU ẨN)
+         ========================================================================== -->
+    <div id="admin-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+        <div class="glass-panel rounded-3xl max-w-5xl w-full p-6 sm:p-8 border border-purple-500/40 relative max-h-[92vh] overflow-y-auto">
+            <button type="button" onclick="closeAdminModal()" class="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/5 hover:bg-white/15 text-slate-300 flex items-center justify-center cursor-pointer">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <!-- Màn hình đăng nhập Admin bằng tài khoản & mật khẩu (không lộ gợi ý mật khẩu hoặc giá trị điền sẵn) -->
+            <div id="admin-login-view" class="max-w-sm mx-auto py-6 text-center">
+                <div class="w-14 h-14 rounded-2xl bg-purple-500/20 border border-purple-500/40 text-purple-400 flex items-center justify-center mx-auto mb-4 text-2xl">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <h3 class="font-display text-2xl font-bold text-white">Quản Trị Võ Hoài Nam</h3>
+                <p class="text-xs text-slate-400 mt-1 mb-6">Đăng nhập bằng tài khoản và mật khẩu quản trị</p>
+
+                <form onsubmit="handleAdminLogin(event)" class="space-y-4 text-left">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Tài khoản Admin *</label>
+                        <input type="text" id="admin-user-input" value="" autocomplete="username" required placeholder="Nhập tài khoản admin..." class="w-full px-4 py-3 rounded-xl bg-slate-950 border border-white/15 focus:border-purple-400 outline-none text-white font-mono text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Mật khẩu Admin *</label>
+                        <input type="password" id="admin-pass-input" value="" autocomplete="current-password" required placeholder="Nhập mật khẩu admin..." class="w-full px-4 py-3 rounded-xl bg-slate-950 border border-white/15 focus:border-purple-400 outline-none text-white font-mono text-sm">
+                    </div>
+
+                    <button type="submit" class="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm cursor-pointer">
+                        Đăng Nhập Bảng Điều Khiển
+                    </button>
+                </form>
+            </div>
+
+            <!-- Màn hình Bảng điều khiển Admin -->
+            <div id="admin-dashboard-view" class="hidden space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-white/10">
+                    <div>
+                        <span class="text-xs font-bold text-purple-400 uppercase tracking-wider">Admin Control Panel v7.0</span>
+                        <h3 class="font-display text-2xl font-bold text-white">Quản Lý Kho Key, Cấp Key & Số Dư Thành Viên</h3>
+                    </div>
+                    <button type="button" onclick="resetAllSystemDemo()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-white/10 text-xs font-bold cursor-pointer flex items-center gap-2 self-start">
+                        <i class="fa-solid fa-rotate-right"></i> Khôi Phục Dữ Liệu Mẫu
+                    </button>
+                </div>
+
+                <!-- 1. Quản Lý Kho Key (Stock Management) -->
+                <div class="bg-slate-950/75 rounded-2xl p-4 sm:p-5 border border-cyan-500/25">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-boxes-stacked text-cyan-400"></i>
+                            <h4 class="font-display font-bold text-base text-white">1. Quản Lý Tồn Kho 5 Gói Key (+5 Key / Đặt Số Lượng / Khóa 0)</h4>
+                        </div>
+                        <span class="text-[11px] text-slate-400">Đặt về <strong class="text-rose-400">0</strong> để khóa mua hàng tự động</span>
+                    </div>
+                    <div id="admin-stock-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <!-- Render bằng JS -->
+                    </div>
+                </div>
+
+                <!-- 2. Tạo & Thêm Key Vào Kho Gói Hoặc Cấp Thẳng Cho Thành Viên -->
+                <div class="bg-slate-950/75 rounded-2xl p-4 sm:p-5 border border-amber-500/25">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+                        <h4 class="font-display font-bold text-base text-white">2. Tạo & Thêm Key Vào Kho Gói Hoặc Cấp Thẳng Cho Thành Viên</h4>
+                    </div>
+                    <form id="admin-inject-key-form" onsubmit="handleAdminInjectKey(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                        <select id="inject-pkg-select" class="px-3 py-2.5 rounded-xl bg-slate-900 border border-white/15 focus:border-amber-400 outline-none text-white text-xs">
+                            <option value="KEY1H">Gói 1 Giờ (700đ)</option>
+                            <option value="KEY1D">Gói 1 Ngày (10.000đ)</option>
+                            <option value="KEY7D">Gói 7 Ngày (60.000đ)</option>
+                            <option value="KEY30D">Gói 30 Ngày (250.000đ)</option>
+                            <option value="KEYVIP">Gói Vĩnh Viễn VIP (750.000đ)</option>
+                        </select>
+
+                        <select id="inject-target-mode" onchange="toggleInjectTargetUser()" class="px-3 py-2.5 rounded-xl bg-slate-900 border border-white/15 focus:border-cyan-400 outline-none text-white text-xs">
+                            <option value="STOCK_POOL">Thêm +N Key vào Kho Gói</option>
+                            <option value="MEMBER_DIRECT">Cấp Key thẳng cho Member</option>
+                        </select>
+
+                        <select id="inject-target-user" class="hidden px-3 py-2.5 rounded-xl bg-slate-900 border border-purple-500/35 focus:border-purple-400 outline-none text-cyan-300 text-xs">
+                            <!-- Render danh sách username bằng JS -->
+                        </select>
+
+                        <input type="text" id="inject-custom-key" placeholder="Mã Key tùy chỉnh (để trống = tự sinh)" class="px-3 py-2.5 rounded-xl bg-slate-900 border border-white/15 focus:border-cyan-400 outline-none text-white font-mono text-xs">
+
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="inject-key-qty" min="1" max="500" value="1" title="Số lượng key thêm" class="w-16 px-2 py-2.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-xs text-center">
+                            <button type="submit" class="flex-1 px-3 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-extrabold text-xs cursor-pointer flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-plus-circle"></i> Thêm Key
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 3. Điều Chỉnh (+/-) Tiền Số Dư Tài Khoản Thành Viên -->
+                <div class="bg-slate-950/75 rounded-2xl p-4 sm:p-5 border border-emerald-500/25">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-coins text-emerald-400"></i>
+                            <h4 class="font-display font-bold text-base text-white">3. Cộng / Trừ (+/-) Tiền Số Dư Tài Khoản Thành Viên</h4>
+                        </div>
+                        <span class="text-[11px] text-slate-400">Hỗ trợ số âm (VD: <code class="text-rose-400">-10000</code>) hoặc cộng nhanh (<code class="text-emerald-400">+50000</code>)</span>
+                    </div>
+
+                    <form id="admin-adjust-balance-form" onsubmit="handleAdminAdjustBalance(event)" class="space-y-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                            <select id="bal-target-user" class="px-3 py-2.5 rounded-xl bg-slate-900 border border-white/15 focus:border-emerald-400 outline-none text-cyan-300 font-semibold text-xs">
+                                <!-- Render danh sách username bằng JS -->
+                            </select>
+
+                            <input type="number" step="100" id="bal-adjust-amount" required placeholder="VD: 50000 hoặc -10000" class="px-3 py-2.5 rounded-xl bg-slate-900 border border-white/15 focus:border-emerald-400 outline-none text-white font-mono text-xs">
+
+                            <input type="text" id="bal-adjust-note" placeholder="Lý do (VD: Admin nạp tiền qua QR PHAN CHI VY)..." class="lg:col-span-2 px-3 py-2.5 rounded-xl bg-slate-900 border border-white/15 focus:border-purple-400 outline-none text-white text-xs">
+
+                            <button type="submit" class="px-3 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-extrabold text-xs cursor-pointer flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-scale-balanced"></i> Áp Dụng Số Dư
+                            </button>
+                        </div>
+
+                        <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                            <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                <span class="text-slate-400 mr-1">Cộng/Trừ nhanh:</span>
+                                <button type="button" onclick="quickAdjustBalance(50000)" class="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 font-mono font-bold cursor-pointer">+50.000đ</button>
+                                <button type="button" onclick="quickAdjustBalance(100000)" class="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 font-mono font-bold cursor-pointer">+100.000đ</button>
+                                <button type="button" onclick="quickAdjustBalance(250000)" class="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 font-mono font-bold cursor-pointer">+250.000đ</button>
+                                <button type="button" onclick="quickAdjustBalance(-10000)" class="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 font-mono font-bold cursor-pointer">-10.000đ</button>
+                                <button type="button" onclick="quickAdjustBalance(-50000)" class="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 font-mono font-bold cursor-pointer">-50.000đ</button>
+                            </div>
+
+                            <label class="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+                                <input type="checkbox" id="bal-prevent-negative" checked class="rounded accent-emerald-400 w-4 h-4">
+                                <span>Chặn số dư âm (không cho trừ vượt số dư hiện có)</span>
+                            </label>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 4. Tạo Tài Khoản Khách Hàng & Danh Sách Thành Viên -->
+                <div>
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                        <h4 class="font-display font-bold text-base text-white flex items-center gap-2">
+                            <i class="fa-solid fa-users text-purple-400"></i> 4. Tạo Tài Khoản Mới & Danh Sách Thành Viên
+                        </h4>
+                    </div>
+
+                    <form id="admin-create-user-form" onsubmit="handleAdminCreateUser(event)" class="mb-4 p-3.5 rounded-2xl bg-slate-900/85 border border-purple-500/25 grid grid-cols-1 sm:grid-cols-5 gap-2.5">
+                        <input type="text" id="admin-new-username" required minlength="3" maxlength="20" pattern="[a-zA-Z0-9_]+" placeholder="Tên tài khoản mới..." class="px-3 py-2 rounded-xl bg-slate-950 border border-white/15 focus:border-cyan-400 outline-none text-white text-xs">
+                        <input type="text" id="admin-new-contact" required placeholder="Email / SĐT khách..." class="px-3 py-2 rounded-xl bg-slate-950 border border-white/15 focus:border-purple-400 outline-none text-white text-xs">
+                        <input type="password" id="admin-new-password" required minlength="4" placeholder="Mật khẩu..." class="px-3 py-2 rounded-xl bg-slate-950 border border-white/15 focus:border-emerald-400 outline-none text-white text-xs">
+                        <input type="number" id="admin-new-init-balance" min="0" value="0" placeholder="Số dư ban đầu..." class="px-3 py-2 rounded-xl bg-slate-950 border border-white/15 focus:border-amber-400 outline-none text-amber-300 font-mono text-xs">
+                        <button type="submit" class="px-3 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-slate-950 font-extrabold text-xs cursor-pointer flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-user-plus"></i> Tạo Tài Khoản
+                        </button>
+                    </form>
+
+                    <div class="overflow-x-auto bg-slate-950/60 rounded-2xl border border-white/10 p-3">
+                        <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                            <thead>
+                                <tr class="border-b border-white/10 text-slate-400">
+                                    <th class="py-2.5 px-2">Tài Khoản</th>
+                                    <th class="py-2.5 px-2">Số Dư</th>
+                                    <th class="py-2.5 px-2">Liên Hệ</th>
+                                    <th class="py-2.5 px-2">Số Key</th>
+                                    <th class="py-2.5 px-2">Danh Sách Key Sở Hữu</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-users-table" class="divide-y divide-white/5">
+                                <!-- Render bằng JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================================
+         JAVASCRIPT XỬ LÝ 3D SÓNG ĐỘNG (THREE.JS + TILT) & LOGIC KHO + SỐ DƯ
+         ========================================================================== -->
+    <script>
+        /* ==========================================================================
+           0. CẤU HÌNH CLOUDFLARE WORKER (API_BASE) & XÁC THỰC ADMIN (chivy / Vy@26092014)
+           ========================================================================== */
+        // Đặt URL Cloudflare Worker (ví dụ: 'https://vo-hoai-nam-key-api.<ten>.workers.dev') nếu muốn đồng bộ backend.
+        // Để trống '' để chạy độc lập với localStorage trên GitHub Pages / Cloudflare Pages.
+        const API_BASE = '';
+        const ADMIN_USERNAME = 'chivy';
+        const ADMIN_PASSWORD_RAW = ['Vy', '@', '26092014'].join('');
+
+        // Hàm băm SHA-256 động (không lưu chuỗi mật khẩu thô cố định hoặc hash viết tay dễ lệch)
+        async function sha256Hex(text) {
+            if (window.crypto && window.crypto.subtle) {
+                const encoded = new TextEncoder().encode(String(text));
+                const digest = await window.crypto.subtle.digest('SHA-256', encoded);
+                return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+            }
+            let h1 = 0xdeadbeef ^ String(text).length;
+            let h2 = 0x41c6ce57 ^ String(text).length;
+            for (let i = 0; i < String(text).length; i++) {
+                const ch = String(text).charCodeAt(i);
+                h1 = Math.imul(h1 ^ ch, 2654435761);
+                h2 = Math.imul(h2 ^ ch, 1597334677);
+            }
+            h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+            h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+            return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16);
+        }
+
+        // Gửi yêu cầu đồng bộ tới Cloudflare Worker khi API_BASE được cấu hình
+        async function callWorkerAPI(endpoint, payload = null, method = 'POST') {
+            if (!API_BASE) return null;
+            try {
+                const cleanBase = API_BASE.replace(/\/+$/, '');
+                const options = {
+                    method,
+                    headers: { 'Content-Type': 'application/json' }
+                };
+                if (method !== 'GET' && payload !== null) {
+                    options.body = JSON.stringify(payload);
+                }
+                const res = await fetch(`${cleanBase}${endpoint}`, options);
+                if (!res.ok) return null;
+                return await res.json();
+            } catch (err) {
+                return null;
+            }
+        }
+
+        // Ảnh dự phòng nếu file ./admin-qr.jpg chưa được tải lên cùng thư mục
+        function handleAdminQrFallback(imgEl) {
+            if (imgEl.dataset.fallbackApplied) return;
+            imgEl.dataset.fallbackApplied = '1';
+            try {
+                const c = document.createElement('canvas');
+                c.width = 240;
+                c.height = 300;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, c.width, c.height);
+                ctx.strokeStyle = '#16a34a';
+                ctx.lineWidth = 8;
+                ctx.strokeRect(10, 10, c.width - 20, c.height - 20);
+                ctx.fillStyle = '#0f172a';
+                ctx.font = 'bold 16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('QR NHẬN TIỀN ADMIN', c.width / 2, 115);
+                ctx.fillStyle = '#16a34a';
+                ctx.font = 'bold 20px sans-serif';
+                ctx.fillText('PHAN CHI VY', c.width / 2, 148);
+                ctx.fillStyle = '#475569';
+                ctx.font = '12px sans-serif';
+                ctx.fillText('Đặt file admin-qr.jpg', c.width / 2, 185);
+                ctx.fillText('cùng thư mục index.html', c.width / 2, 204);
+                imgEl.src = c.toDataURL('image/png');
+            } catch (err) {
+                imgEl.src = 'https://placehold.co/240x300/ffffff/0f172a?text=PHAN+CHI+VY';
+            }
+        }
+
+        /* ==========================================================================
+           1. KHỞI TẠO KHÔNG GIAN 3D SÓNG ĐỘNG TƯƠNG TÁC (THREE.JS)
+           ========================================================================== */
+        function initThreeJSBackground() {
+            try {
+                const canvas = document.getElementById('bg-canvas');
+                const scene = new THREE.Scene();
+                scene.fog = new THREE.FogExp2(0x050811, 0.032);
+
+                const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(0, 3.5, 17);
+
+                const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+                const waveCols = 64;
+                const waveRows = 44;
+                const waveCount = waveCols * waveRows;
+                const wavePositions = new Float32Array(waveCount * 3);
+                const waveBasePositions = new Float32Array(waveCount * 3);
+                const waveColors = new Float32Array(waveCount * 3);
+
+                const colorCyan = new THREE.Color(0x00f2fe);
+                const colorPurple = new THREE.Color(0xa855f7);
+
+                let idx = 0;
+                for (let ix = 0; ix < waveCols; ix++) {
+                    for (let iy = 0; iy < waveRows; iy++) {
+                        const x = (ix - waveCols / 2) * 0.65;
+                        const z = (iy - waveRows / 2) * 0.65 - 2;
+                        const y = -4.5;
+
+                        wavePositions[idx] = x;
+                        wavePositions[idx + 1] = y;
+                        wavePositions[idx + 2] = z;
+
+                        waveBasePositions[idx] = x;
+                        waveBasePositions[idx + 1] = y;
+                        waveBasePositions[idx + 2] = z;
+
+                        const ratio = ix / waveCols;
+                        const c = colorCyan.clone().lerp(colorPurple, ratio);
+                        waveColors[idx] = c.r;
+                        waveColors[idx + 1] = c.g;
+                        waveColors[idx + 2] = c.b;
+                        idx += 3;
+                    }
+                }
+
+                const waveGeo = new THREE.BufferGeometry();
+                waveGeo.setAttribute('position', new THREE.BufferAttribute(wavePositions, 3));
+                waveGeo.setAttribute('color', new THREE.BufferAttribute(waveColors, 3));
+
+                const waveMat = new THREE.PointsMaterial({
+                    size: 0.15,
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.78
+                });
+                const waveMesh = new THREE.Points(waveGeo, waveMat);
+                scene.add(waveMesh);
+
+                const coreGeo = new THREE.IcosahedronGeometry(3.1, 1);
+                const coreMat = new THREE.MeshBasicMaterial({
+                    color: 0x00f2fe,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.22
+                });
+                const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+                coreMesh.position.y = 1.2;
+                scene.add(coreMesh);
+
+                const ringGeo = new THREE.TorusGeometry(4.8, 0.035, 16, 100);
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.42 });
+                const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                ringMesh.position.y = 1.2;
+                ringMesh.rotation.x = Math.PI / 3;
+                scene.add(ringMesh);
+
+                const starCount = 550;
+                const starPos = new Float32Array(starCount * 3);
+                const starCol = new Float32Array(starCount * 3);
+                for (let i = 0; i < starCount * 3; i += 3) {
+                    starPos[i] = (Math.random() - 0.5) * 44;
+                    starPos[i + 1] = (Math.random() - 0.5) * 28 + 2;
+                    starPos[i + 2] = (Math.random() - 0.5) * 34;
+
+                    const mc = Math.random() > 0.5 ? colorCyan : colorPurple;
+                    starCol[i] = mc.r;
+                    starCol[i + 1] = mc.g;
+                    starCol[i + 2] = mc.b;
+                }
+                const starGeo = new THREE.BufferGeometry();
+                starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+                starGeo.setAttribute('color', new THREE.BufferAttribute(starCol, 3));
+                const starMat = new THREE.PointsMaterial({
+                    size: 0.12,
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.65
+                });
+                const starMesh = new THREE.Points(starGeo, starMat);
+                scene.add(starMesh);
+
+                let mouseX = 0;
+                let mouseY = 0;
+                document.addEventListener('mousemove', (e) => {
+                    mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+                    mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+                });
+                document.addEventListener('touchmove', (e) => {
+                    if (e.touches.length > 0) {
+                        mouseX = (e.touches[0].clientX / window.innerWidth - 0.5) * 2;
+                        mouseY = (e.touches[0].clientY / window.innerHeight - 0.5) * 2;
+                    }
+                }, { passive: true });
+
+                window.addEventListener('resize', () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+
+                const clock = new THREE.Clock();
+                function animate() {
+                    requestAnimationFrame(animate);
+                    const t = clock.getElapsedTime();
+
+                    const posAttr = waveGeo.attributes.position;
+                    for (let i = 0; i < waveCount; i++) {
+                        const i3 = i * 3;
+                        const bx = waveBasePositions[i3];
+                        const bz = waveBasePositions[i3 + 2];
+                        const waveHeight =
+                            Math.sin(bx * 0.28 + t * 1.9) * 1.15 +
+                            Math.cos(bz * 0.32 + t * 1.5) * 0.95 +
+                            Math.sin((bx + bz) * 0.18 - t * 2.2) * 0.55;
+                        posAttr.array[i3 + 1] = -4.5 + waveHeight;
+                    }
+                    posAttr.needsUpdate = true;
+
+                    coreMesh.rotation.y = t * 0.24;
+                    coreMesh.rotation.x = t * 0.14;
+                    ringMesh.rotation.z = -t * 0.32;
+                    starMesh.rotation.y = t * 0.035 + mouseX * 0.2;
+
+                    camera.position.x += (mouseX * 2.0 - camera.position.x) * 0.04;
+                    camera.position.y += (3.5 - mouseY * 1.4 - camera.position.y) * 0.04;
+                    camera.lookAt(0, 0.2, 0);
+
+                    renderer.render(scene, camera);
+                }
+                animate();
+            } catch (err) {
+                console.error('Lỗi khởi tạo Three.js:', err);
+            }
+        }
+
+        /* ==========================================================================
+           2. HIỆU ỨNG THẺ NGHIÊNG 3D (CSS 3D TILT CARDS)
+           ========================================================================== */
+        function init3DTiltCards() {
+            const cards = document.querySelectorAll('.tilt-card');
+            cards.forEach(card => {
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+
+                    const rotateX = ((y - centerY) / centerY) * -6;
+                    const rotateY = ((x - centerX) / centerX) * 6;
+
+                    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+                });
+
+                card.addEventListener('mouseleave', () => {
+                    card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+                });
+            });
+        }
+
+        /* ==========================================================================
+           3. LƯU TRỮ DỮ LIỆU: TỒN KHO 5 GÓI KEY & TÀI KHOẢN + SỐ DƯ + LỊCH SỬ
+           ========================================================================== */
+        const STORAGE_STOCK = 'vhn_store_stock_v7';
+        const STORAGE_USERS = 'vhn_store_users_v7';
+        const STORAGE_CURRENT_USER = 'vhn_store_session_v7';
+
+        const ENFORCED_PRICES = {
+            KEY1H: 700,
+            KEY1D: 10000,
+            KEY7D: 60000,
+            KEY30D: 250000,
+            KEYVIP: 750000
+        };
+
+        const defaultPackagesConfig = [
+            {
+                id: 'KEY1H',
+                badge: 'Flash 1H',
+                icon: 'fa-bolt',
+                name: 'Gói 1 Giờ (1h)',
+                fullName: 'Gói 1 Giờ (1h)',
+                durationText: '01 Giờ kể từ khi nhận',
+                desc: 'Test nhanh & dùng cấp tốc trong 60 phút',
+                price: 700,
+                theme: 'cyan',
+                stock: 25,
+                features: [
+                    { ok: true, text: 'Cấp Key tức thì khi đủ số dư' },
+                    { ok: true, text: 'Lưu Key vào tài khoản cá nhân' },
+                    { ok: true, text: 'Đầy đủ tính năng bản quyền' },
+                    { ok: false, text: 'Thời hạn ngắn 1 giờ (1h)' }
+                ]
+            },
+            {
+                id: 'KEY1D',
+                badge: 'Trải Nghiệm',
+                icon: 'fa-paper-plane',
+                name: 'Gói 1 Ngày (1d)',
+                fullName: 'Gói 1 Ngày (1d)',
+                durationText: '24 Giờ (1 ngày) kể từ khi nhận',
+                desc: 'Trải nghiệm trọn vẹn 1 ngày sử dụng',
+                price: 10000,
+                theme: 'blue',
+                stock: 18,
+                features: [
+                    { ok: true, text: 'Cấp Key tức thì khi đủ số dư' },
+                    { ok: true, text: 'Lưu Key vào tài khoản cá nhân' },
+                    { ok: true, text: 'Mở khóa toàn bộ tính năng' },
+                    { ok: true, text: 'Hỗ trợ kỹ thuật 24/7' }
+                ]
+            },
+            {
+                id: 'KEY7D',
+                badge: 'Phổ Biến',
+                icon: 'fa-rocket',
+                name: 'Gói 7 Ngày (7d)',
+                fullName: 'Gói 7 Ngày (7d)',
+                durationText: '07 Ngày sử dụng',
+                desc: 'Lựa chọn phổ biến cho 1 tuần sử dụng',
+                price: 60000,
+                theme: 'cyan',
+                stock: 12,
+                features: [
+                    { ok: true, text: 'Cấp Key tức thì khi đủ số dư' },
+                    { ok: true, text: 'Lưu Key vào tài khoản cá nhân' },
+                    { ok: true, text: 'Cập nhật bản mới miễn phí' },
+                    { ok: true, text: 'Hỗ trợ Zalo / Telegram nhanh' }
+                ]
+            },
+            {
+                id: 'KEY30D',
+                badge: 'Chuyên Nghiệp',
+                topRibbon: { icon: 'fa-fire', text: 'Chuyên Nghiệp', gradient: 'from-purple-600 to-pink-500 text-white shadow-purple-500/40' },
+                icon: 'fa-gem',
+                name: 'Gói 30 Ngày (30d)',
+                fullName: 'Gói 30 Ngày (30d)',
+                durationText: '30 Ngày sử dụng',
+                desc: 'Tối ưu chi phí cho 30 ngày chuyên nghiệp',
+                price: 250000,
+                theme: 'purple',
+                stock: 8,
+                features: [
+                    { ok: true, text: 'Ưu tiên đường truyền Server VIP' },
+                    { ok: true, text: 'Lưu trữ lịch sử Key trọn đời' },
+                    { ok: true, text: 'Bảo hành lỗi 1 đổi 1 tức thì' },
+                    { ok: true, text: 'Hỗ trợ cài đặt 24/7' }
+                ]
+            },
+            {
+                id: 'KEYVIP',
+                badge: 'VIP Trọn Đời',
+                topRibbon: { icon: 'fa-crown', text: 'VIP Trọn Đời', gradient: 'from-amber-500 to-yellow-400 text-slate-950 shadow-amber-500/40' },
+                icon: 'fa-crown',
+                name: 'Gói Vĩnh Viễn VIP (lifetime)',
+                fullName: 'Gói Vĩnh Viễn VIP (lifetime)',
+                durationText: 'Vĩnh viễn (Trọn đời)',
+                desc: 'Mua 1 lần - Bản quyền VIP trọn đời',
+                price: 750000,
+                theme: 'gold',
+                stock: 0,
+                features: [
+                    { ok: true, text: 'Bản quyền vĩnh viễn không gia hạn' },
+                    { ok: true, text: 'Nhận mọi bản Update VIP sớm nhất' },
+                    { ok: true, text: 'Bảo hành & hỗ trợ riêng 1-1' },
+                    { ok: true, text: 'Đặc quyền thành viên VIP trọn đời' }
+                ]
+            }
+        ];
+
+        function getNowTimeStr() {
+            const now = new Date();
+            return `${now.toLocaleDateString('vi-VN')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        }
+
+        function normalizePackagesState(rawList) {
+            const baseList = JSON.parse(JSON.stringify(defaultPackagesConfig));
+            if (!Array.isArray(rawList) || rawList.length === 0) {
+                return baseList;
+            }
+
+            return baseList.map(defaultPkg => {
+                const savedPkg = rawList.find(item => item && (item.id === defaultPkg.id || (defaultPkg.id === 'KEY1H' && item.id === '1h') || (defaultPkg.id === 'KEY1D' && item.id === '1d') || (defaultPkg.id === 'KEY7D' && item.id === '7d') || (defaultPkg.id === 'KEY30D' && item.id === '30d') || (defaultPkg.id === 'KEYVIP' && item.id === 'lifetime')));
+                const parsedStock = savedPkg && typeof savedPkg.stock !== 'undefined'
+                    ? Math.max(0, parseInt(savedPkg.stock, 10) || 0)
+                    : defaultPkg.stock;
+
+                return {
+                    ...defaultPkg,
+                    price: ENFORCED_PRICES[defaultPkg.id] ?? defaultPkg.price,
+                    stock: parsedStock
+                };
+            });
+        }
+
+        const defaultUsersDB = {
+            'khachhang': {
+                username: 'khachhang',
+                contact: 'khachhang@gmail.com',
+                password: '123456',
+                balance: 50000,
+                createdAt: '25/11/2026',
+                balanceLogs: [
+                    {
+                        time: '25/11/2026 20:00',
+                        delta: 50000,
+                        afterBalance: 50000,
+                        note: 'Số dư khởi tạo thành viên'
+                    }
+                ],
+                keys: [
+                    {
+                        code: 'VHN-KEY1H-700A',
+                        pkgId: 'KEY1H',
+                        planName: 'Gói 1 Giờ (1h)',
+                        price: 700,
+                        method: 'Số dư TK',
+                        purchasedAt: '25/11/2026 21:00',
+                        expiry: '01 Giờ kể từ khi nhận',
+                        status: 'active'
+                    }
+                ]
+            }
+        };
+
+        function getPackagesDB() {
+            try {
+                const data = localStorage.getItem(STORAGE_STOCK);
+                if (!data) {
+                    const fresh = normalizePackagesState(defaultPackagesConfig);
+                    localStorage.setItem(STORAGE_STOCK, JSON.stringify(fresh));
+                    return fresh;
+                }
+                const normalized = normalizePackagesState(JSON.parse(data));
+                localStorage.setItem(STORAGE_STOCK, JSON.stringify(normalized));
+                return normalized;
+            } catch (err) {
+                return normalizePackagesState(defaultPackagesConfig);
+            }
+        }
+
+        function savePackagesDB(packages, syncPayload = null) {
+            try {
+                const normalized = normalizePackagesState(packages);
+                localStorage.setItem(STORAGE_STOCK, JSON.stringify(normalized));
+                if (syncPayload) {
+                    callWorkerAPI('/api/admin/action', syncPayload);
+                }
+            } catch (err) {
+                showToast('Không thể lưu dữ liệu kho vào trình duyệt!', 'error');
+            }
+        }
+
+        function getUsersDB() {
+            try {
+                const data = localStorage.getItem(STORAGE_USERS);
+                if (!data) {
+                    localStorage.setItem(STORAGE_USERS, JSON.stringify(defaultUsersDB));
+                    return JSON.parse(JSON.stringify(defaultUsersDB));
+                }
+                const parsed = JSON.parse(data);
+                Object.keys(parsed).forEach(uKey => {
+                    parsed[uKey].balance = Number(parsed[uKey].balance || 0);
+                    if (!Array.isArray(parsed[uKey].balanceLogs)) parsed[uKey].balanceLogs = [];
+                    if (!Array.isArray(parsed[uKey].keys)) parsed[uKey].keys = [];
+                });
+                return parsed;
+            } catch (err) {
+                return JSON.parse(JSON.stringify(defaultUsersDB));
+            }
+        }
+
+        function saveUsersDB(users) {
+            try {
+                localStorage.setItem(STORAGE_USERS, JSON.stringify(users));
+            } catch (err) {
+                showToast('Không thể lưu dữ liệu tài khoản!', 'error');
+            }
+        }
+
+        function getCurrentUser() {
+            const username = localStorage.getItem(STORAGE_CURRENT_USER);
+            if (!username) return null;
+            const users = getUsersDB();
+            return users[username] || null;
+        }
+
+        function setCurrentUser(username) {
+            if (username) {
+                localStorage.setItem(STORAGE_CURRENT_USER, username);
+            } else {
+                localStorage.removeItem(STORAGE_CURRENT_USER);
+            }
+        }
+
+        function resetAllSystemDemo() {
+            localStorage.setItem(STORAGE_STOCK, JSON.stringify(defaultPackagesConfig));
+            localStorage.setItem(STORAGE_USERS, JSON.stringify(defaultUsersDB));
+            renderPricingCards();
+            renderAccountUI();
+            if (isAdminLoggedIn) {
+                refreshAdminViews();
+            }
+            showToast('Đã khôi phục kho 5 gói Key và dữ liệu tài khoản mẫu!', 'info');
+        }
+
+        /* ==========================================================================
+           4. RENDER GIAO DIỆN TÀI KHOẢN, SỐ DƯ & KHO KEY CÁ NHÂN
+           ========================================================================== */
+        function formatMoney(val) {
+            return Number(val || 0).toLocaleString('vi-VN') + ' VNĐ';
+        }
+
+        function renderAccountUI() {
+            const user = getCurrentUser();
+            const headerArea = document.getElementById('header-account-area');
+            const heroBtnText = document.getElementById('hero-account-btn-text');
+            const vaultActions = document.getElementById('vault-header-actions');
+            const vaultFilterBar = document.getElementById('vault-filter-bar');
+            const vaultContent = document.getElementById('page-vault-content');
+
+            if (!user) {
+                headerArea.innerHTML = `
+                    <button type="button" onclick="openAuthModal('login')" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs sm:text-sm shadow-md shadow-cyan-500/20 transition-all cursor-pointer flex items-center gap-1.5">
+                        <i class="fa-solid fa-user-plus"></i>
+                        <span>Đăng Nhập / Đăng Ký</span>
+                    </button>
+                `;
+
+                if (heroBtnText) heroBtnText.textContent = 'Tạo Tài Khoản / Đăng Nhập';
+                if (vaultFilterBar) vaultFilterBar.classList.add('hidden');
+
+                vaultActions.innerHTML = `
+                    <button type="button" onclick="openAuthModal('register')" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold text-xs sm:text-sm cursor-pointer">
+                        <i class="fa-solid fa-user-plus mr-1.5"></i> Tạo Tài Khoản Ngay
+                    </button>
+                `;
+
+                vaultContent.innerHTML = `
+                    <div class="text-center py-10 px-4 bg-slate-950/60 rounded-2xl border border-dashed border-white/15">
+                        <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center mx-auto mb-3 text-2xl">
+                            <i class="fa-solid fa-lock"></i>
+                        </div>
+                        <h3 class="font-display font-bold text-lg text-white">Bạn Chưa Đăng Nhập Tài Khoản</h3>
+                        <p class="text-slate-400 text-xs sm:text-sm max-w-md mx-auto mt-1.5 mb-5">
+                            Vui lòng đăng nhập hoặc tạo tài khoản mới để xem số dư tài khoản, lịch sử biến động tiền và danh sách mã Key đã mua.
+                        </p>
+                        <div class="flex items-center justify-center gap-3">
+                            <button type="button" onclick="openAuthModal('register')" class="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs sm:text-sm cursor-pointer">
+                                Tạo Tài Khoản Mới
+                            </button>
+                            <button type="button" onclick="openAuthModal('login')" class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs sm:text-sm cursor-pointer">
+                                Đăng Nhập
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                const allKeys = user.keys || [];
+                const keyCount = allKeys.length;
+                const balColorClass = user.balance < 0 ? 'text-rose-400' : 'text-amber-300';
+
+                headerArea.innerHTML = `
+                    <button type="button" onclick="openUserModal()" class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2">
+                        <i class="fa-solid fa-circle-user text-cyan-400 text-base"></i>
+                        <span class="max-w-[80px] sm:max-w-[115px] truncate">${user.username}</span>
+                        <span class="hidden sm:inline px-2 py-0.5 rounded-md bg-slate-950/90 border border-amber-500/30 ${balColorClass} font-mono text-[11px] font-extrabold">${formatMoney(user.balance)}</span>
+                        <span class="px-1.5 py-0.5 rounded-md bg-cyan-400 text-slate-950 text-[10px] font-extrabold">${keyCount} Key</span>
+                    </button>
+                `;
+
+                if (heroBtnText) heroBtnText.textContent = `${user.username} • ${formatMoney(user.balance)} (${keyCount} Key)`;
+                if (vaultFilterBar) vaultFilterBar.classList.remove('hidden');
+
+                vaultActions.innerHTML = `
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-xs font-mono font-bold ${balColorClass} bg-amber-500/10 px-3 py-2 rounded-xl border border-amber-500/30">
+                            Số dư: ${formatMoney(user.balance)}
+                        </span>
+                        <button type="button" onclick="openUserModal()" class="px-3.5 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 font-bold text-xs cursor-pointer">
+                            Tài Khoản & Lịch Sử
+                        </button>
+                    </div>
+                `;
+
+                const searchVal = (document.getElementById('vault-search-input')?.value || '').trim().toLowerCase();
+                const filterPkg = document.getElementById('vault-pkg-filter')?.value || 'ALL';
+
+                const filteredKeys = allKeys.filter(k => {
+                    const matchPkg = filterPkg === 'ALL' || k.pkgId === filterPkg || (k.code && k.code.includes(filterPkg));
+                    const matchSearch = !searchVal ||
+                        (k.code && k.code.toLowerCase().includes(searchVal)) ||
+                        (k.planName && k.planName.toLowerCase().includes(searchVal));
+                    return matchPkg && matchSearch;
+                });
+
+                if (keyCount === 0) {
+                    vaultContent.innerHTML = `
+                        <div class="text-center py-10 px-4 bg-slate-950/60 rounded-2xl border border-white/10">
+                            <i class="fa-solid fa-box-open text-3xl text-slate-500 mb-3"></i>
+                            <h3 class="font-display font-bold text-lg text-white">Tài khoản của bạn chưa có Key nào</h3>
+                            <p class="text-slate-400 text-xs sm:text-sm mt-1 mb-5">Hãy chọn một gói Key bên trên để kích hoạt bản quyền ngay!</p>
+                            <a href="#pricing" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold text-xs sm:text-sm">
+                                <i class="fa-solid fa-cart-shopping"></i> Chọn Gói Key Ngay
+                            </a>
+                        </div>
+                    `;
+                } else if (filteredKeys.length === 0) {
+                    vaultContent.innerHTML = `
+                        <div class="text-center py-8 px-4 bg-slate-950/60 rounded-2xl border border-white/10 text-slate-400 text-sm">
+                            Không tìm thấy mã Key nào khớp với từ khóa hoặc bộ lọc hiện tại.
+                        </div>
+                    `;
+                } else {
+                    vaultContent.innerHTML = `
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${filteredKeys.map(k => renderKeyItemCard(k)).join('')}
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function renderKeyItemCard(k) {
+            const formattedPrice = Number(k.price || 0).toLocaleString('vi-VN');
+            const viaBadge = k.method ? `<span class="text-[10px] px-2 py-0.5 rounded bg-white/5 text-slate-300">${k.method}</span>` : '';
+            return `
+                <div class="p-4 rounded-2xl bg-slate-950/90 border border-cyan-500/25 hover:border-cyan-400/50 transition-all flex flex-col justify-between gap-3">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="text-xs font-bold text-cyan-400">${k.planName}</span>
+                                <span class="text-[11px] font-semibold text-amber-400">(${formattedPrice}đ)</span>
+                                ${viaBadge}
+                            </div>
+                            <div class="text-[11px] text-slate-400 mt-0.5">Nhận lúc: ${k.purchasedAt} • Hạn: <span class="text-slate-200">${k.expiry}</span></div>
+                        </div>
+                        <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-extrabold uppercase shrink-0">
+                            Đang hoạt động
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-900 border border-white/10">
+                        <code class="font-mono font-bold text-sm text-amber-300 select-all truncate">${k.code}</code>
+                        <button type="button" onclick="copyText('${k.code}', 'Đã sao chép mã Key: ${k.code}')" class="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 font-bold text-xs transition-colors cursor-pointer shrink-0 flex items-center gap-1.5">
+                            <i class="fa-regular fa-copy"></i> Copy Key
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        /* ==========================================================================
+           5. LOGIC ĐĂNG KÝ / ĐĂNG NHẬP & GHI NHỚ GÓI ĐANG MUA
+           ========================================================================== */
+        let pendingPurchasePackage = null;
+
+        function openAuthModal(defaultTab = 'register', pendingPkg = null) {
+            pendingPurchasePackage = pendingPkg;
+            const banner = document.getElementById('pending-pkg-banner');
+            const bannerText = document.getElementById('pending-pkg-text');
+
+            if (pendingPkg) {
+                banner.classList.remove('hidden');
+                bannerText.innerHTML = `Bạn đang chọn <strong class="text-white">${pendingPkg.fullName}</strong> (${pendingPkg.price.toLocaleString('vi-VN')} VNĐ). Tạo tài khoản hoặc đăng nhập để kiểm tra số dư và mua Key!`;
+            } else {
+                banner.classList.add('hidden');
+            }
+
+            switchAuthTab(defaultTab);
+            const modal = document.getElementById('auth-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeAuthModal() {
+            const modal = document.getElementById('auth-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function switchAuthTab(tab) {
+            const tabReg = document.getElementById('auth-tab-register');
+            const tabLog = document.getElementById('auth-tab-login');
+            const formReg = document.getElementById('register-form');
+            const formLog = document.getElementById('login-form');
+
+            if (tab === 'register') {
+                tabReg.className = 'flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 transition-all cursor-pointer';
+                tabLog.className = 'flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-400 hover:text-white transition-all cursor-pointer';
+                formReg.classList.remove('hidden');
+                formLog.classList.add('hidden');
+            } else {
+                tabLog.className = 'flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-purple-600 to-indigo-600 text-white transition-all cursor-pointer';
+                tabReg.className = 'flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-400 hover:text-white transition-all cursor-pointer';
+                formLog.classList.remove('hidden');
+                formReg.classList.add('hidden');
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const username = document.getElementById('reg-username').value.trim().toLowerCase();
+            const contact = document.getElementById('reg-contact').value.trim();
+            const password = document.getElementById('reg-password').value;
+
+            const users = getUsersDB();
+            if (users[username]) {
+                showToast(`Tên đăng nhập "${username}" đã tồn tại! Vui lòng chọn tên khác hoặc chuyển sang Đăng nhập.`, 'error');
+                return;
+            }
+
+            users[username] = {
+                username: username,
+                contact: contact,
+                password: password,
+                balance: 0,
+                createdAt: new Date().toLocaleDateString('vi-VN'),
+                balanceLogs: [
+                    {
+                        time: getNowTimeStr(),
+                        delta: 0,
+                        afterBalance: 0,
+                        note: 'Đăng ký tài khoản mới'
+                    }
+                ],
+                keys: []
+            };
+
+            saveUsersDB(users);
+            setCurrentUser(username);
+            await callWorkerAPI('/api/auth/register', { username, password });
+            renderAccountUI();
+            if (isAdminLoggedIn) refreshAdminViews();
+            closeAuthModal();
+            showToast(`Tạo tài khoản "${username}" thành công!`, 'success');
+
+            if (pendingPurchasePackage) {
+                const pkgToBuy = pendingPurchasePackage;
+                pendingPurchasePackage = null;
+                setTimeout(() => {
+                    initiatePurchase(pkgToBuy.id);
+                }, 250);
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value.trim().toLowerCase();
+            const password = document.getElementById('login-password').value;
+
+            const users = getUsersDB();
+            const user = users[username];
+
+            if (!user || user.password !== password) {
+                showToast('Sai tên đăng nhập hoặc mật khẩu!', 'error');
+                return;
+            }
+
+            setCurrentUser(username);
+            await callWorkerAPI('/api/auth/login', { username, password });
+            renderAccountUI();
+            closeAuthModal();
+            showToast(`Chào mừng ${username} quay trở lại!`, 'success');
+
+            if (pendingPurchasePackage) {
+                const pkgToBuy = pendingPurchasePackage;
+                pendingPurchasePackage = null;
+                setTimeout(() => {
+                    initiatePurchase(pkgToBuy.id);
+                }, 250);
+            }
+        }
+
+        function handleLogout() {
+            setCurrentUser(null);
+            closeUserModal();
+            renderAccountUI();
+            showToast('Bạn đã đăng xuất khỏi tài khoản.', 'info');
+        }
+
+        function openUserDashboardOrAuth() {
+            const user = getCurrentUser();
+            if (user) {
+                openUserModal();
+            } else {
+                openAuthModal('register');
+            }
+        }
+
+        function handleNavMyKeys(e) {
+            const user = getCurrentUser();
+            if (!user) {
+                e.preventDefault();
+                openAuthModal('login');
+                showToast('Vui lòng đăng nhập để xem Kho Key của bạn!', 'info');
+            }
+        }
+
+        function openUserModal() {
+            const user = getCurrentUser();
+            if (!user) {
+                openAuthModal('login');
+                return;
+            }
+
+            document.getElementById('user-modal-avatar').textContent = user.username.charAt(0).toUpperCase();
+            document.getElementById('user-modal-name').textContent = user.username;
+            const balEl = document.getElementById('user-modal-balance');
+            balEl.textContent = formatMoney(user.balance);
+            balEl.className = user.balance < 0
+                ? 'px-3 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono text-xs font-extrabold'
+                : 'px-3 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono text-xs font-extrabold';
+
+            document.getElementById('user-modal-contact').textContent = `${user.contact} • Tham gia: ${user.createdAt}`;
+            document.getElementById('user-modal-key-count').textContent = `${user.keys.length} Key`;
+
+            const logsContainer = document.getElementById('user-modal-balance-logs');
+            const logs = user.balanceLogs || [];
+            if (logs.length === 0) {
+                logsContainer.innerHTML = `<div class="text-slate-500">Chưa có lịch sử biến động số dư.</div>`;
+            } else {
+                logsContainer.innerHTML = logs.map(item => {
+                    const isPlus = item.delta >= 0;
+                    const sign = item.delta > 0 ? '+' : '';
+                    return `
+                        <div class="flex items-center justify-between gap-2 py-1.5 px-2.5 rounded-lg bg-slate-900/80 border border-white/5">
+                            <div>
+                                <span class="font-mono font-bold ${isPlus ? 'text-emerald-400' : 'text-rose-400'}">${sign}${Number(item.delta).toLocaleString('vi-VN')}đ</span>
+                                <span class="text-slate-300 ml-1.5">${item.note || ''}</span>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <span class="text-slate-400 mr-2">${item.time}</span>
+                                <span class="font-mono text-amber-300 font-semibold">SD: ${Number(item.afterBalance).toLocaleString('vi-VN')}đ</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            const listContainer = document.getElementById('user-modal-keys-list');
+            if (user.keys.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="text-center py-8 bg-slate-950/70 rounded-2xl border border-white/10 text-slate-400 text-sm">
+                        Bạn chưa sở hữu mã Key nào. Hãy chọn gói Key phù hợp để mua ngay!
+                    </div>
+                `;
+            } else {
+                listContainer.innerHTML = user.keys.map(k => renderKeyItemCard(k)).join('');
+            }
+
+            const modal = document.getElementById('user-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeUserModal() {
+            const modal = document.getElementById('user-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        /* ==========================================================================
+           6. RENDER 5 THẺ GÓI KEY 3D & KIỂM TRA TỒN KHO (STOCK <= 0 => KHÓA MUA)
+           ========================================================================== */
+        function renderPricingCards() {
+            const grid = document.getElementById('pricing-grid');
+            if (!grid) return;
+            const packages = getPackagesDB();
+
+            const themeMap = {
+                cyan: {
+                    cardBorder: 'neon-border-cyan border border-white/10',
+                    badge: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+                    iconColor: 'text-cyan-400',
+                    priceClass: 'text-white',
+                    currencyClass: 'text-cyan-400',
+                    checkColor: 'text-cyan-400',
+                    btnClass: 'bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 border border-cyan-500/40',
+                    btnText: 'Mua Key Ngay'
+                },
+                blue: {
+                    cardBorder: 'neon-border-cyan border border-white/10',
+                    badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+                    iconColor: 'text-blue-400',
+                    priceClass: 'text-white',
+                    currencyClass: 'text-blue-400',
+                    checkColor: 'text-blue-400',
+                    btnClass: 'bg-blue-500/20 hover:bg-blue-500 text-blue-300 hover:text-white border border-blue-500/40',
+                    btnText: 'Mua Key Ngay'
+                },
+                purple: {
+                    cardBorder: 'neon-border-purple border-2 relative',
+                    badge: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+                    iconColor: 'text-purple-400',
+                    priceClass: 'bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent',
+                    currencyClass: 'text-purple-400',
+                    checkColor: 'text-purple-400',
+                    btnClass: 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-500/30',
+                    btnText: 'Mua Key Ngay'
+                },
+                gold: {
+                    cardBorder: 'neon-border-gold border-2 relative',
+                    badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+                    iconColor: 'text-amber-400',
+                    priceClass: 'bg-gradient-to-r from-amber-300 to-yellow-500 bg-clip-text text-transparent',
+                    currencyClass: 'text-amber-400',
+                    checkColor: 'text-amber-400',
+                    btnClass: 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-extrabold shadow-lg shadow-amber-500/30',
+                    btnText: 'Mua Gói VIP'
+                }
+            };
+
+            grid.innerHTML = packages.map(pkg => {
+                const t = themeMap[pkg.theme] || themeMap.cyan;
+                const isOutOfStock = pkg.stock <= 0;
+
+                let stockBadgeHTML = '';
+                if (isOutOfStock) {
+                    stockBadgeHTML = `
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-400 text-[10px] font-extrabold uppercase">
+                            <i class="fa-solid fa-ban"></i> Hết hàng (0 key)
+                        </span>`;
+                } else if (pkg.stock <= 5) {
+                    stockBadgeHTML = `
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold">
+                            <i class="fa-solid fa-fire-flame-curved"></i> Còn ${pkg.stock} key
+                        </span>`;
+                } else {
+                    stockBadgeHTML = `
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Còn ${pkg.stock} key
+                        </span>`;
+                }
+
+                const ribbonHTML = pkg.topRibbon
+                    ? `<div class="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3.5 py-1 rounded-full bg-gradient-to-r ${isOutOfStock ? 'from-slate-700 to-slate-600 text-slate-300' : pkg.topRibbon.gradient} text-[10px] font-extrabold uppercase tracking-wider shadow-lg whitespace-nowrap">
+                        <i class="fa-solid ${isOutOfStock ? 'fa-lock' : pkg.topRibbon.icon} mr-1"></i> ${isOutOfStock ? 'Hết Hàng' : pkg.topRibbon.text}
+                       </div>`
+                    : '';
+
+                const cardStateClasses = isOutOfStock
+                    ? 'border border-rose-500/30 opacity-70 grayscale-[40%] relative'
+                    : t.cardBorder;
+
+                const buttonHTML = isOutOfStock
+                    ? `<button type="button" onclick="handleOutOfStockClick('${pkg.fullName}')" aria-disabled="true" class="tilt-card-inner w-full py-3 rounded-xl bg-slate-800/90 text-rose-400 font-extrabold text-xs border border-rose-500/30 cursor-not-allowed flex items-center justify-center gap-1.5 select-none">
+                        <i class="fa-solid fa-lock"></i>
+                        <span>ĐÃ HẾT KEY</span>
+                       </button>`
+                    : `<button type="button" onclick="initiatePurchase('${pkg.id}')" class="tilt-card-inner w-full py-3 rounded-xl ${t.btnClass} font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-cart-plus"></i>
+                        <span>${t.btnText}</span>
+                       </button>`;
+
+                return `
+                    <div class="tilt-card glass-panel rounded-3xl p-5 flex flex-col justify-between ${cardStateClasses}">
+                        ${ribbonHTML}
+                        <div class="tilt-card-inner">
+                            <div class="flex items-center justify-between gap-1.5 mb-3 ${pkg.topRibbon ? 'mt-1' : ''}">
+                                <span class="px-2.5 py-0.5 rounded-full ${isOutOfStock ? 'bg-slate-800 text-slate-400 border-white/10' : t.badge} text-[11px] font-bold border">${pkg.badge}</span>
+                                ${stockBadgeHTML}
+                            </div>
+                            <div class="flex items-center justify-between gap-2">
+                                <h3 class="font-display text-lg font-bold text-white leading-snug">${pkg.name}</h3>
+                                <i class="fa-solid ${pkg.icon} ${isOutOfStock ? 'text-slate-500' : t.iconColor} text-lg shrink-0"></i>
+                            </div>
+                            <p class="text-slate-400 text-xs mt-1 min-h-[32px]">${pkg.desc}</p>
+                            
+                            <div class="my-4 pb-4 border-b border-white/10">
+                                <span class="font-display text-2xl sm:text-3xl font-extrabold ${isOutOfStock ? 'text-slate-400 line-through decoration-rose-500/70' : t.priceClass}">${pkg.price.toLocaleString('vi-VN')}</span>
+                                <span class="${isOutOfStock ? 'text-slate-500' : t.currencyClass} font-bold text-xs ml-0.5">VNĐ</span>
+                            </div>
+
+                            <ul class="space-y-2.5 text-xs text-slate-300 mb-6">
+                                ${pkg.features.map(f => `
+                                    <li class="flex items-start gap-2 ${f.ok ? '' : 'text-slate-500'}">
+                                        <i class="fa-solid ${f.ok ? 'fa-circle-check ' + (isOutOfStock ? 'text-slate-500' : t.checkColor) : 'fa-circle-xmark'} mt-0.5 shrink-0"></i>
+                                        <span>${f.text}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                        ${buttonHTML}
+                    </div>
+                `;
+            }).join('');
+
+            init3DTiltCards();
+        }
+
+        function handleOutOfStockClick(pkgName) {
+            showToast(`Gói "${pkgName}" đang hết hàng (0 key) và đã bị khóa mua!`, 'error');
+        }
+
+        /* ==========================================================================
+           7. QUY TRÌNH MUA KEY: KIỂM TRA CHẶT SỐ DƯ & QR NẠP TIỀN PHAN CHI VY
+           ========================================================================== */
+        let currentSelectedPkg = null;
+
+        function initiatePurchase(pkgId) {
+            const packages = getPackagesDB();
+            const targetPkg = packages.find(p => p.id === pkgId);
+            if (!targetPkg || targetPkg.stock <= 0) {
+                showToast('Gói key này đã hết hàng, vui lòng chọn gói khác!', 'error');
+                renderPricingCards();
+                return;
+            }
+
+            const currentUser = getCurrentUser();
+            if (!currentUser) {
+                openAuthModal('register', targetPkg);
+                showToast('Vui lòng tạo tài khoản hoặc đăng nhập để mua Key!', 'info');
+                return;
+            }
+
+            const usersDB = getUsersDB();
+            const freshUser = usersDB[currentUser.username] || currentUser;
+            const currentBalance = Number(freshUser.balance || 0);
+            const price = Number(targetPkg.price || 0);
+
+            // Chặn mua ngay nếu khách không đủ số dư
+            if (currentBalance < price) {
+                const missing = price - currentBalance;
+                showToast(
+                    `Số dư của bạn (${currentBalance.toLocaleString('vi-VN')}đ) không đủ để mua ${targetPkg.fullName} (${price.toLocaleString('vi-VN')}đ). Thiếu ${missing.toLocaleString('vi-VN')}đ!`,
+                    'error'
+                );
+                return;
+            }
+
+            const memo = `VHN ${freshUser.username.toUpperCase()} ${targetPkg.id}`;
+            currentSelectedPkg = {
+                id: targetPkg.id,
+                pkgName: targetPkg.fullName,
+                durationText: targetPkg.durationText,
+                price: price,
+                memo: memo
+            };
+
+            document.getElementById('modal-pkg-name').textContent = `${targetPkg.fullName} (Kho còn ${targetPkg.stock} key)`;
+            document.getElementById('modal-pkg-price').textContent = price.toLocaleString('vi-VN') + ' VNĐ';
+
+            const balInfoEl = document.getElementById('modal-current-balance-info');
+            balInfoEl.textContent = `Số dư tài khoản: ${formatMoney(currentBalance)}`;
+            balInfoEl.className = 'text-xs text-emerald-400 font-semibold mt-1';
+
+            const payBalBtn = document.getElementById('pay-with-balance-btn');
+            const payBalLabel = document.getElementById('pay-with-balance-label');
+            const payBalHint = document.getElementById('pay-balance-hint');
+
+            payBalBtn.disabled = false;
+            payBalBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            payBalLabel.textContent = `Trừ ${price.toLocaleString('vi-VN')}đ Từ Số Dư & Nhận Key`;
+            payBalHint.textContent = `Số dư còn lại sau mua: ${(currentBalance - price).toLocaleString('vi-VN')} VNĐ`;
+
+            document.getElementById('modal-buyer-username').textContent = `@${freshUser.username}`;
+            document.getElementById('transfer-memo').textContent = memo;
+
+            const qrImgEl = document.getElementById('modal-qr-img');
+            if (qrImgEl) {
+                delete qrImgEl.dataset.fallbackApplied;
+                qrImgEl.src = './admin-qr.jpg';
+            }
+
+            const modal = document.getElementById('payment-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closePaymentModal() {
+            const modal = document.getElementById('payment-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function copyMemo() {
+            const memo = document.getElementById('transfer-memo').textContent;
+            copyText(memo, 'Đã sao chép nội dung nạp tiền!');
+        }
+
+        async function payWithAccountBalance() {
+            const currentUser = getCurrentUser();
+            if (!currentUser || !currentSelectedPkg) {
+                showToast('Vui lòng đăng nhập và chọn gói key trước!', 'error');
+                return;
+            }
+
+            const usersDB = getUsersDB();
+            const userRecord = usersDB[currentUser.username];
+            if (!userRecord) {
+                showToast('Không tìm thấy tài khoản thành viên!', 'error');
+                return;
+            }
+
+            const currentBalance = Number(userRecord.balance || 0);
+            const price = Number(currentSelectedPkg.price || 0);
+
+            // Chặn tuyệt đối nếu số dư không đủ
+            if (currentBalance < price) {
+                const missing = price - currentBalance;
+                closePaymentModal();
+                renderAccountUI();
+                showToast(
+                    `Không đủ số dư! Bạn còn ${currentBalance.toLocaleString('vi-VN')}đ, thiếu ${missing.toLocaleString('vi-VN')}đ để mua ${currentSelectedPkg.pkgName}.`,
+                    'error'
+                );
+                return;
+            }
+
+            const packages = getPackagesDB();
+            const pkgIndex = packages.findIndex(p => p.id === currentSelectedPkg.id);
+            if (pkgIndex === -1 || packages[pkgIndex].stock <= 0) {
+                closePaymentModal();
+                renderPricingCards();
+                showToast('Rất tiếc! Key của gói này đã hết hàng.', 'error');
+                return;
+            }
+
+            // Trừ tiền số dư & ghi lịch sử biến động
+            userRecord.balance = currentBalance - price;
+            if (!Array.isArray(userRecord.balanceLogs)) userRecord.balanceLogs = [];
+            userRecord.balanceLogs.unshift({
+                time: getNowTimeStr(),
+                delta: -price,
+                afterBalance: userRecord.balance,
+                note: `Mua ${currentSelectedPkg.pkgName}`
+            });
+
+            // Trừ 1 key tồn kho & cấp key vào tài khoản
+            packages[pkgIndex].stock = Math.max(0, packages[pkgIndex].stock - 1);
+            const remainingStock = packages[pkgIndex].stock;
+            const randCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+            const generatedKey = `VHN-${currentSelectedPkg.id}-${randCode}`;
+
+            if (!Array.isArray(userRecord.keys)) userRecord.keys = [];
+            const newKeyObj = {
+                code: generatedKey,
+                pkgId: currentSelectedPkg.id,
+                planName: currentSelectedPkg.pkgName,
+                price: price,
+                method: 'Số dư TK',
+                purchasedAt: getNowTimeStr(),
+                expiry: currentSelectedPkg.durationText,
+                status: 'active'
+            };
+            userRecord.keys.unshift(newKeyObj);
+
+            saveUsersDB(usersDB);
+            savePackagesDB(packages);
+            await callWorkerAPI('/api/purchase', {
+                username: userRecord.username,
+                password: userRecord.password,
+                pkgId: currentSelectedPkg.id
+            });
+
+            closePaymentModal();
+            renderPricingCards();
+            renderAccountUI();
+            if (isAdminLoggedIn) {
+                refreshAdminViews();
+            }
+
+            const vaultSection = document.getElementById('my-keys-section');
+            if (vaultSection) vaultSection.scrollIntoView({ behavior: 'smooth' });
+
+            const stockNote = remainingStock === 0 ? ' (Gói này đã hết key trong kho!)' : '';
+            showToast(`Mua thành công! Đã trừ ${price.toLocaleString('vi-VN')}đ và cấp Key ${generatedKey}${stockNote}`, 'success');
+            copyText(generatedKey, `Đã sao chép Key mới: ${generatedKey}`);
+        }
+
+        /* ==========================================================================
+           8. CỔNG ADMIN & BẢNG QUẢN TRỊ ADMIN (chivy / Vy@26092014)
+           ========================================================================== */
+        let isAdminLoggedIn = false;
+        let cachedAdminCreds = null;
+        let secretLogoTaps = 0;
+        let secretLogoTimer = null;
+
+        function handleLogoSecretTap(e) {
+            secretLogoTaps += 1;
+            clearTimeout(secretLogoTimer);
+            if (secretLogoTaps >= 5) {
+                e.preventDefault();
+                secretLogoTaps = 0;
+                openAdminModal();
+                return;
+            }
+            secretLogoTimer = setTimeout(() => {
+                secretLogoTaps = 0;
+            }, 1500);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key && e.key.toLowerCase() === 'a') {
+                e.preventDefault();
+                openAdminModal();
+            }
+        });
+
+        function openAdminModal() {
+            const modal = document.getElementById('admin-modal');
+            const userInput = document.getElementById('admin-user-input');
+            const passInput = document.getElementById('admin-pass-input');
+            if (userInput) userInput.value = '';
+            if (passInput) passInput.value = '';
+
+            if (!isAdminLoggedIn) {
+                document.getElementById('admin-login-view').classList.remove('hidden');
+                document.getElementById('admin-dashboard-view').classList.add('hidden');
+            } else {
+                document.getElementById('admin-login-view').classList.add('hidden');
+                document.getElementById('admin-dashboard-view').classList.remove('hidden');
+                refreshAdminViews();
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeAdminModal() {
+            const userInput = document.getElementById('admin-user-input');
+            const passInput = document.getElementById('admin-pass-input');
+            if (userInput) userInput.value = '';
+            if (passInput) passInput.value = '';
+            const modal = document.getElementById('admin-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function handleAdminLogin(e) {
+            e.preventDefault();
+            const userInput = document.getElementById('admin-user-input');
+            const passInput = document.getElementById('admin-pass-input');
+            const enteredUser = userInput.value.trim().toLowerCase();
+            const rawPass = passInput.value;
+
+            userInput.value = '';
+            passInput.value = '';
+
+            const [inUserHash, inPassHash, expectedUserHash, expectedPassHash] = await Promise.all([
+                sha256Hex(enteredUser),
+                sha256Hex(rawPass),
+                sha256Hex(ADMIN_USERNAME),
+                sha256Hex(ADMIN_PASSWORD_RAW)
+            ]);
+
+            if (inUserHash === expectedUserHash && inPassHash === expectedPassHash) {
+                isAdminLoggedIn = true;
+                cachedAdminCreds = { adminUser: enteredUser, adminPass: rawPass };
+                await callWorkerAPI('/api/admin/login', { username: enteredUser, password: rawPass });
+                document.getElementById('admin-login-view').classList.add('hidden');
+                document.getElementById('admin-dashboard-view').classList.remove('hidden');
+                refreshAdminViews();
+                showToast('Đăng nhập quản trị viên thành công!', 'success');
+            } else {
+                showToast('Tài khoản hoặc mật khẩu quản trị không đúng!', 'error');
+            }
+        }
+
+        function refreshAdminViews() {
+            renderAdminStockManager();
+            populateAdminMemberSelects();
+            renderAdminUsersTable();
+        }
+
+        function populateAdminMemberSelects() {
+            const usersDB = getUsersDB();
+            const usernames = Object.keys(usersDB);
+
+            const balSelect = document.getElementById('bal-target-user');
+            const injectUserSelect = document.getElementById('inject-target-user');
+
+            if (balSelect) {
+                const prevBal = balSelect.value;
+                balSelect.innerHTML = usernames.map(u => `<option value="${u}">@${u} (${Number(usersDB[u].balance || 0).toLocaleString('vi-VN')}đ)</option>`).join('');
+                if (prevBal && usersDB[prevBal]) balSelect.value = prevBal;
+            }
+
+            if (injectUserSelect) {
+                const prevInj = injectUserSelect.value;
+                injectUserSelect.innerHTML = usernames.map(u => `<option value="${u}">Tài khoản: @${u}</option>`).join('');
+                if (prevInj && usersDB[prevInj]) injectUserSelect.value = prevInj;
+            }
+        }
+
+        function toggleInjectTargetUser() {
+            const mode = document.getElementById('inject-target-mode').value;
+            const userSelect = document.getElementById('inject-target-user');
+            const qtyInput = document.getElementById('inject-key-qty');
+
+            if (mode === 'MEMBER_DIRECT') {
+                userSelect.classList.remove('hidden');
+                qtyInput.max = 20;
+            } else {
+                userSelect.classList.add('hidden');
+                qtyInput.max = 500;
+            }
+        }
+
+        function renderAdminStockManager() {
+            const container = document.getElementById('admin-stock-grid');
+            if (!container) return;
+            const packages = getPackagesDB();
+
+            container.innerHTML = packages.map(pkg => {
+                const isOut = pkg.stock <= 0;
+                return `
+                    <div class="p-3.5 rounded-xl bg-slate-900/90 border ${isOut ? 'border-rose-500/40' : 'border-white/10'} flex flex-col justify-between gap-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <div>
+                                <span class="font-bold text-xs sm:text-sm text-white">${pkg.name}</span>
+                                <span class="block text-[11px] text-slate-400">${pkg.price.toLocaleString('vi-VN')} VNĐ • <span class="text-cyan-400">${pkg.badge}</span></span>
+                            </div>
+                            <span class="px-2.5 py-1 rounded-full text-[11px] font-extrabold shrink-0 ${isOut ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}">
+                                ${isOut ? 'Hết hàng (0 key)' : `Còn ${pkg.stock} key`}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-1.5 pt-2 border-t border-white/5">
+                            <input type="number" min="0" id="stock-input-${pkg.id}" value="${pkg.stock}" class="w-14 px-1.5 py-1.5 rounded-lg bg-slate-950 border border-white/15 text-white font-mono text-xs text-center focus:border-cyan-400 outline-none">
+                            <button type="button" onclick="adminSetStock('${pkg.id}')" class="px-2 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 font-bold text-xs transition-colors cursor-pointer">
+                                Lưu
+                            </button>
+                            <button type="button" onclick="adminAddStock('${pkg.id}', 5)" class="px-2 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 font-bold text-xs transition-colors cursor-pointer ml-auto">
+                                +5
+                            </button>
+                            <button type="button" onclick="adminSetZeroStock('${pkg.id}')" class="px-2 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white font-bold text-xs transition-colors cursor-pointer">
+                                0
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function adminSetStock(pkgId) {
+            const inputEl = document.getElementById(`stock-input-${pkgId}`);
+            const newVal = Math.max(0, parseInt(inputEl.value, 10) || 0);
+            const packages = getPackagesDB();
+            const pkg = packages.find(p => p.id === pkgId);
+            if (!pkg) return;
+
+            pkg.stock = newVal;
+            savePackagesDB(packages);
+            if (cachedAdminCreds) {
+                await callWorkerAPI('/api/admin/action', { ...cachedAdminCreds, action: 'set_stock', pkgId, stock: newVal });
+            }
+            renderPricingCards();
+            renderAdminStockManager();
+            showToast(`Đã cập nhật kho "${pkg.name}" thành ${newVal} key!`, newVal === 0 ? 'info' : 'success');
+        }
+
+        async function adminAddStock(pkgId, amount) {
+            const packages = getPackagesDB();
+            const pkg = packages.find(p => p.id === pkgId);
+            if (!pkg) return;
+
+            pkg.stock = Math.max(0, pkg.stock) + amount;
+            savePackagesDB(packages);
+            if (cachedAdminCreds) {
+                await callWorkerAPI('/api/admin/action', { ...cachedAdminCreds, action: 'set_stock', pkgId, stock: pkg.stock });
+            }
+            renderPricingCards();
+            renderAdminStockManager();
+            showToast(`Đã nạp thêm +${amount} key vào "${pkg.name}" (Tổng: ${pkg.stock} key)!`, 'success');
+        }
+
+        async function adminSetZeroStock(pkgId) {
+            const packages = getPackagesDB();
+            const pkg = packages.find(p => p.id === pkgId);
+            if (!pkg) return;
+
+            pkg.stock = 0;
+            savePackagesDB(packages);
+            if (cachedAdminCreds) {
+                await callWorkerAPI('/api/admin/action', { ...cachedAdminCreds, action: 'set_stock', pkgId, stock: 0 });
+            }
+            renderPricingCards();
+            renderAdminStockManager();
+            showToast(`Đã đặt "${pkg.name}" về Hết hàng (0 key)!`, 'info');
+        }
+
+        async function handleAdminInjectKey(e) {
+            e.preventDefault();
+            const pkgId = document.getElementById('inject-pkg-select').value;
+            const mode = document.getElementById('inject-target-mode').value;
+            const targetUser = document.getElementById('inject-target-user').value;
+            const customCodeRaw = document.getElementById('inject-custom-key').value.trim().toUpperCase();
+            const qty = Math.max(1, parseInt(document.getElementById('inject-key-qty').value, 10) || 1);
+
+            const packages = getPackagesDB();
+            const pkg = packages.find(p => p.id === pkgId);
+            if (!pkg) return;
+
+            if (mode === 'STOCK_POOL') {
+                pkg.stock = Math.max(0, pkg.stock) + qty;
+                savePackagesDB(packages);
+                if (cachedAdminCreds) {
+                    await callWorkerAPI('/api/admin/action', { ...cachedAdminCreds, action: 'set_stock', pkgId, stock: pkg.stock });
+                }
+                renderPricingCards();
+                renderAdminStockManager();
+                const sampleCode = customCodeRaw || `VHN-${pkg.id}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+                showToast(`Đã thêm +${qty} key vào kho "${pkg.name}" (Mẫu: ${sampleCode}, Tổng kho: ${pkg.stock} key)!`, 'success');
+                document.getElementById('inject-custom-key').value = '';
+            } else {
+                const usersDB = getUsersDB();
+                if (!usersDB[targetUser]) {
+                    showToast('Không tìm thấy tài khoản thành viên được chọn!', 'error');
+                    return;
+                }
+
+                if (!Array.isArray(usersDB[targetUser].keys)) usersDB[targetUser].keys = [];
+
+                const createdCodes = [];
+                for (let i = 0; i < qty; i++) {
+                    const randSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+                    const code = customCodeRaw
+                        ? (qty > 1 ? `${customCodeRaw}-${i + 1}` : customCodeRaw)
+                        : `VHN-${pkg.id}-${randSuffix}`;
+
+                    usersDB[targetUser].keys.unshift({
+                        code: code,
+                        pkgId: pkg.id,
+                        planName: pkg.fullName,
+                        price: pkg.price,
+                        method: 'Admin Cấp',
+                        purchasedAt: getNowTimeStr(),
+                        expiry: pkg.durationText,
+                        status: 'active'
+                    });
+                    createdCodes.push(code);
+
+                    if (cachedAdminCreds) {
+                        await callWorkerAPI('/api/admin/action', {
+                            ...cachedAdminCreds,
+                            action: 'grant_key',
+                            targetUsername: targetUser,
+                            pkgId,
+                            customKey: code
+                        });
+                    }
+                }
+
+                saveUsersDB(usersDB);
+                renderAccountUI();
+                renderAdminUsersTable();
+                document.getElementById('inject-custom-key').value = '';
+                showToast(`Đã cấp ${qty} Key cho @${targetUser}: ${createdCodes[0]}${qty > 1 ? ` (+${qty - 1})` : ''}`, 'success');
+            }
+        }
+
+        function quickAdjustBalance(amount) {
+            const amountInput = document.getElementById('bal-adjust-amount');
+            const currentVal = parseInt(amountInput.value, 10) || 0;
+            amountInput.value = currentVal + amount;
+        }
+
+        async function handleAdminAdjustBalance(e) {
+            e.preventDefault();
+            const username = document.getElementById('bal-target-user').value;
+            const delta = parseInt(document.getElementById('bal-adjust-amount').value, 10);
+            const noteInput = document.getElementById('bal-adjust-note');
+            const preventNegative = document.getElementById('bal-prevent-negative').checked;
+
+            if (isNaN(delta) || delta === 0) {
+                showToast('Vui lòng nhập số tiền cộng hoặc trừ khác 0 (VD: 50000 hoặc -10000)!', 'error');
+                return;
+            }
+
+            const usersDB = getUsersDB();
+            const targetUser = usersDB[username];
+            if (!targetUser) {
+                showToast('Không tìm thấy tài khoản thành viên!', 'error');
+                return;
+            }
+
+            const oldBalance = Number(targetUser.balance || 0);
+            const nextBalance = oldBalance + delta;
+
+            if (preventNegative && nextBalance < 0) {
+                showToast(`Không thể trừ vượt quá số dư hiện tại (${oldBalance.toLocaleString('vi-VN')}đ). Bỏ tích "Chặn số dư âm" nếu muốn cho phép âm.`, 'error');
+                return;
+            }
+
+            targetUser.balance = nextBalance;
+            if (!Array.isArray(targetUser.balanceLogs)) targetUser.balanceLogs = [];
+            const defaultNote = delta > 0 ? 'Admin cộng tiền số dư' : 'Admin trừ tiền số dư';
+            const reason = noteInput.value.trim() || defaultNote;
+
+            targetUser.balanceLogs.unshift({
+                time: getNowTimeStr(),
+                delta: delta,
+                afterBalance: nextBalance,
+                note: reason
+            });
+
+            saveUsersDB(usersDB);
+            if (cachedAdminCreds) {
+                await callWorkerAPI('/api/admin/action', {
+                    ...cachedAdminCreds,
+                    action: 'adjust_balance',
+                    targetUsername: username,
+                    delta,
+                    note: reason
+                });
+            }
+
+            noteInput.value = '';
+            document.getElementById('bal-adjust-amount').value = '';
+
+            renderAccountUI();
+            populateAdminMemberSelects();
+            renderAdminUsersTable();
+
+            const sign = delta > 0 ? '+' : '';
+            showToast(`Đã cập nhật số dư @${username} (${sign}${delta.toLocaleString('vi-VN')}đ) → ${nextBalance.toLocaleString('vi-VN')}đ`, 'success');
+        }
+
+        async function handleAdminCreateUser(e) {
+            e.preventDefault();
+            const usernameInput = document.getElementById('admin-new-username');
+            const contactInput = document.getElementById('admin-new-contact');
+            const passwordInput = document.getElementById('admin-new-password');
+            const initBalInput = document.getElementById('admin-new-init-balance');
+
+            const username = usernameInput.value.trim().toLowerCase();
+            const contact = contactInput.value.trim();
+            const password = passwordInput.value;
+            const initBalance = Math.max(0, parseInt(initBalInput.value, 10) || 0);
+
+            const users = getUsersDB();
+            if (users[username]) {
+                showToast(`Tài khoản "${username}" đã tồn tại!`, 'error');
+                return;
+            }
+
+            users[username] = {
+                username: username,
+                contact: contact,
+                password: password,
+                balance: initBalance,
+                createdAt: new Date().toLocaleDateString('vi-VN'),
+                balanceLogs: [
+                    {
+                        time: getNowTimeStr(),
+                        delta: initBalance,
+                        afterBalance: initBalance,
+                        note: 'Admin tạo tài khoản thành viên'
+                    }
+                ],
+                keys: []
+            };
+
+            saveUsersDB(users);
+            await callWorkerAPI('/api/auth/register', { username, password });
+            if (initBalance > 0 && cachedAdminCreds) {
+                await callWorkerAPI('/api/admin/action', {
+                    ...cachedAdminCreds,
+                    action: 'adjust_balance',
+                    targetUsername: username,
+                    delta: initBalance,
+                    note: 'Số dư khởi tạo bởi Admin'
+                });
+            }
+
+            usernameInput.value = '';
+            contactInput.value = '';
+            passwordInput.value = '';
+            initBalInput.value = '0';
+
+            populateAdminMemberSelects();
+            renderAdminUsersTable();
+            showToast(`Admin đã tạo tài khoản "@${username}" (Số dư: ${initBalance.toLocaleString('vi-VN')}đ)!`, 'success');
+        }
+
+        function renderAdminUsersTable() {
+            const usersDB = getUsersDB();
+            const tbody = document.getElementById('admin-users-table');
+            if (!tbody) return;
+
+            const userList = Object.values(usersDB);
+            tbody.innerHTML = userList.map(u => {
+                const keysArr = u.keys || [];
+                const count = keysArr.length;
+                const bal = Number(u.balance || 0);
+                const balClass = bal < 0 ? 'text-rose-400' : 'text-emerald-400';
+
+                const keyBadges = count > 0
+                    ? keysArr.map(k => `<span class="inline-block px-2 py-0.5 rounded bg-slate-900 border border-amber-500/30 font-mono text-[11px] text-amber-300 mr-1 mb-1">${k.code}</span>`).join('')
+                    : '<span class="text-slate-500 text-xs">Chưa có key</span>';
+
+                return `
+                    <tr class="hover:bg-white/5 align-top">
+                        <td class="py-3 px-2 font-bold text-cyan-400 whitespace-nowrap">@${u.username}</td>
+                        <td class="py-3 px-2 font-mono font-bold ${balClass} whitespace-nowrap">${bal.toLocaleString('vi-VN')}đ</td>
+                        <td class="py-3 px-2 text-slate-300">${u.contact}</td>
+                        <td class="py-3 px-2 whitespace-nowrap">
+                            <span class="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold text-xs">${count} Key</span>
+                        </td>
+                        <td class="py-3 px-2">${keyBadges}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        /* ==========================================================================
+           9. TIỆN ÍCH CHUNG (TOAST, COPY, MOBILE MENU)
+           ========================================================================== */
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colors = {
+                success: 'border-emerald-500/50 bg-slate-900/95 text-emerald-300',
+                error: 'border-rose-500/50 bg-slate-900/95 text-rose-300',
+                info: 'border-cyan-500/50 bg-slate-900/95 text-cyan-300'
+            };
+            const icons = {
+                success: 'fa-circle-check text-emerald-400',
+                error: 'fa-circle-exclamation text-rose-400',
+                info: 'fa-circle-info text-cyan-400'
+            };
+
+            toast.className = `pointer-events-auto p-4 rounded-2xl border backdrop-blur-md shadow-2xl flex items-center gap-3 text-xs sm:text-sm font-medium transition-all transform translate-x-0 ${colors[type]}`;
+            toast.innerHTML = `
+                <i class="fa-solid ${icons[type]} text-lg"></i>
+                <span class="flex-1">${message}</span>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(20px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        function toggleMobileMenu() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        }
+        document.getElementById('mobile-menu-btn').addEventListener('click', toggleMobileMenu);
+
+        function copyText(text, successMsg) {
+            try {
+                const tempInput = document.createElement('input');
+                tempInput.value = text;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+                showToast(successMsg || 'Đã sao chép vào bộ nhớ tạm!', 'success');
+            } catch (err) {
+                showToast('Không thể sao chép tự động, vui lòng bôi đen mã Key.', 'error');
+            }
+        }
+
+        /* ==========================================================================
+           10. KHỞI CHẠY KHI TẢI TRANG XONG
+           ========================================================================== */
+        window.onload = async function () {
+            initThreeJSBackground();
+            if (API_BASE) {
+                const remoteStore = await callWorkerAPI('/api/storefront', null, 'GET');
+                if (remoteStore && Array.isArray(remoteStore.packages)) {
+                    const merged = normalizePackagesState(remoteStore.packages);
+                    localStorage.setItem(STORAGE_STOCK, JSON.stringify(merged));
+                }
+            }
+            renderPricingCards();
+            renderAccountUI();
+        };
+    </script>
+</body>
+</html>
